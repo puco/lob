@@ -11,6 +11,7 @@ namespace Lob
 {
 
 class PickerController;
+class RuleStore;
 class TrayController;
 
 /**
@@ -55,6 +56,7 @@ private:
     void onPickerFinished();
 
     QQmlApplicationEngine *m_engine = nullptr;
+    RuleStore *m_store = nullptr;
     PickerController *m_picker = nullptr;
     TrayController *m_tray = nullptr;
 

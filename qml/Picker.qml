@@ -7,6 +7,7 @@ Window {
     id: root
 
     property bool privateMode: false
+    property bool rememberChoice: false
     property int current: 0
 
     visible: false
@@ -15,16 +16,36 @@ Window {
 
     function choose(index) {
         if (index >= 0 && index < picker.targets.rowCount()) {
-            picker.choose(index, root.privateMode)
+            picker.choose(index, root.privateMode, root.rememberChoice)
         }
     }
 
-    // Reset per invocation: a stale selection or a lingering private toggle
-    // from the previous link would be a nasty surprise.
+    // Reset per invocation: a stale selection, a lingering private toggle or a
+    // leftover "remember" tick from the previous link would all be surprises.
     onVisibleChanged: if (visible) {
         root.current = 0
         root.privateMode = false
+        root.rememberChoice = false
         keyHandler.forceActiveFocus()
+    }
+
+    // Leaving hold mode must stop the countdown, or the decision fires anyway
+    // a moment after the user has overridden it.
+    Connections {
+        target: picker
+        function onContextChanged() {
+            if (picker.holding) {
+                holdTimer.restart()
+            } else {
+                holdTimer.stop()
+            }
+        }
+    }
+
+    Timer {
+        id: holdTimer
+        interval: picker.holdMs
+        onTriggered: picker.holdCompleted()
     }
 
     // Deliberately not a theme colour: Kirigami.Theme does not resolve inside a
@@ -32,10 +53,12 @@ Window {
     // of which theme is active.
     Rectangle {
         anchors.fill: parent
-        color: Qt.rgba(0, 0, 0, 0.6)
+        color: Qt.rgba(0, 0, 0, picker.holding ? 0.35 : 0.6)
+
+        Behavior on color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
 
         TapHandler {
-            onTapped: picker.cancel()
+            onTapped: picker.holding ? picker.interruptHold() : picker.cancel()
         }
     }
 
@@ -45,6 +68,14 @@ Window {
         focus: true
 
         Keys.onPressed: (event) => {
+            // While holding, every key is an escape hatch: the point is that
+            // the decision is easy to catch, not that you must catch it exactly.
+            if (picker.holding) {
+                picker.interruptHold()
+                event.accepted = true
+                return
+            }
+
             switch (event.key) {
             case Qt.Key_Escape:
                 picker.cancel(); event.accepted = true; return
@@ -61,6 +92,8 @@ Window {
                 event.accepted = true; return
             case Qt.Key_P:
                 root.privateMode = !root.privateMode; event.accepted = true; return
+            case Qt.Key_R:
+                root.rememberChoice = !root.rememberChoice; event.accepted = true; return
             case Qt.Key_C:
                 picker.copyUrl(); event.accepted = true; return
             }
@@ -77,9 +110,7 @@ Window {
             spacing: Kirigami.Units.largeSpacing
 
             // The host is the thing you actually decide on, so it carries the
-            // emphasis and the rest of the URL is subordinate to it. Both bind
-            // their width to the outer column: nesting a layout here sizes them
-            // to their own content instead, which elides the URL to nothing.
+            // emphasis and the rest of the URL is subordinate to it.
             Kirigami.Heading {
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
@@ -97,8 +128,46 @@ Window {
                 elide: Text.ElideMiddle
             }
 
+            // ---- Hold: a decision already made, shown so it can be caught ----
             Kirigami.Card {
                 Layout.fillWidth: true
+                visible: picker.holding
+
+                contentItem: ColumnLayout {
+                    spacing: Kirigami.Units.smallSpacing
+
+                    QQC2.Label {
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        text: picker.holdTitle
+                        font.bold: true
+                    }
+
+                    QQC2.Label {
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        text: picker.holdReason
+                        opacity: 0.7
+                        font: Kirigami.Theme.smallFont
+                    }
+
+                    QQC2.ProgressBar {
+                        Layout.fillWidth: true
+                        from: 0
+                        to: picker.holdMs
+                        value: holdTimer.running ? picker.holdMs : 0
+
+                        Behavior on value {
+                            NumberAnimation { duration: picker.holdMs; easing.type: Easing.Linear }
+                        }
+                    }
+                }
+            }
+
+            // ---- Picker ----
+            Kirigami.Card {
+                Layout.fillWidth: true
+                visible: !picker.holding
 
                 contentItem: Flow {
                     spacing: Kirigami.Units.smallSpacing
@@ -152,13 +221,33 @@ Window {
                 }
             }
 
+            RowLayout {
+                Layout.alignment: Qt.AlignHCenter
+                visible: !picker.holding
+                spacing: Kirigami.Units.largeSpacing
+
+                QQC2.CheckBox {
+                    checked: root.rememberChoice
+                    onToggled: root.rememberChoice = checked
+                    text: picker.remembered
+                        ? i18n("Update what I remember for %1", picker.displayHost)
+                        : i18n("Remember for %1", picker.displayHost)
+                }
+
+                QQC2.Label {
+                    visible: root.privateMode
+                    text: i18n("Private window")
+                    font.bold: true
+                }
+            }
+
             QQC2.Label {
                 Layout.alignment: Qt.AlignHCenter
                 opacity: 0.7
                 font: Kirigami.Theme.smallFont
-                text: root.privateMode
-                    ? i18n("Private window · P to turn off · C copy · Esc cancel")
-                    : i18n("1–9 pick · P private · C copy · Esc cancel")
+                text: picker.holding
+                    ? i18n("Any key or click to choose a different browser")
+                    : i18n("1–9 pick · P private · R remember · C copy · Esc cancel")
             }
         }
     }

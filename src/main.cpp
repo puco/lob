@@ -1,8 +1,11 @@
 #include "app/Controller.h"
 #include "core/Launcher.h"
+#include "core/RuleEngine.h"
+#include "core/RuleStore.h"
 #include "core/Startup.h"
 #include "core/Target.h"
 #include "core/TargetRegistry.h"
+#include "core/UrlSanitizer.h"
 
 #include <QApplication>
 #include <QQuickStyle>
@@ -60,7 +63,8 @@ int runList()
         out << "    exec:    " << target.execPath << '\n';
         out << "    engine:  " << familyName(target.family) << '\n';
         if (!target.profileKey.isEmpty()) {
-            out << "    profile: " << target.profileName << "  (" << target.profileKey << ")\n";
+            out << "    profile: " << target.profileName << (target.isDefaultProfile ? " [default]" : "")
+                << "  (" << target.profileKey << ")\n";
         }
 
         // The exact command line, so the launch path is inspectable without
@@ -74,6 +78,69 @@ int runList()
             out << "    BLOCKED: exec is a shell or interpreter\n";
         }
         out << '\n';
+    }
+
+    return 0;
+}
+
+int runExplain(const QString &rawUrl)
+{
+    QTextStream out(stdout);
+
+    const QUrl url = QUrl::fromUserInput(rawUrl);
+    QString reason;
+    if (!Lob::UrlSanitizer::isRoutable(url, &reason)) {
+        out << "refused: " << reason << '\n';
+        return 2;
+    }
+
+    Lob::RuleStore store;
+    const auto rules = store.rules();
+    const Lob::Decision decision = Lob::RuleEngine::decide(url, rules, store.fallbackTargetId());
+
+    out << "url:   " << url.toString() << '\n';
+    out << "host:  " << url.host() << '\n';
+    out << "rules: " << rules.size() << " from " << Lob::RuleStore::filePath() << '\n';
+    out << '\n';
+
+    switch (decision.source) {
+    case Lob::Decision::Source::Rule:
+        out << "-> rule #" << decision.ruleIndex << ": " << Lob::RuleEngine::describe(rules.at(decision.ruleIndex))
+            << '\n';
+        break;
+    case Lob::Decision::Source::Memory:
+        out << "-> remembered #" << decision.ruleIndex << ": "
+            << Lob::RuleEngine::describe(rules.at(decision.ruleIndex)) << '\n';
+        break;
+    case Lob::Decision::Source::Fallback:
+        out << "-> no match; fallback target " << decision.targetId << '\n';
+        break;
+    case Lob::Decision::Source::Ask:
+        out << "-> no match; show the picker\n";
+        break;
+    }
+
+    if (decision.opensWithoutAsking()) {
+        if (decision.action == Lob::RuleAction::Copy) {
+            out << "   copies to the clipboard";
+        } else {
+            out << "   opens in " << decision.targetId << (decision.privateWindow ? " (private)" : "");
+        }
+        out << ", after a " << store.holdMs() << "ms hold bar\n";
+    }
+
+    // Rules that would have matched but were beaten: the usual reason a rule
+    // "does not work" is that an earlier one already claimed the URL.
+    bool shadowedHeader = false;
+    for (int i = 0; i < rules.size(); ++i) {
+        if (i == decision.ruleIndex || !Lob::RuleEngine::matches(rules.at(i), url)) {
+            continue;
+        }
+        if (!shadowedHeader) {
+            out << "\nalso matched, but lost:\n";
+            shadowedHeader = true;
+        }
+        out << "   #" << i << ": " << Lob::RuleEngine::describe(rules.at(i)) << '\n';
     }
 
     return 0;
@@ -114,6 +181,17 @@ int main(int argc, char *argv[])
         return runList();
     }
 
+    if (rawArgs.contains(QStringLiteral("--explain"))) {
+        QCoreApplication app(argc, argv);
+        setupIdentity();
+        const int index = rawArgs.indexOf(QStringLiteral("--explain"));
+        if (index + 1 >= rawArgs.size()) {
+            QTextStream(stderr) << "usage: lob --explain <url>\n";
+            return 2;
+        }
+        return runExplain(rawArgs.at(index + 1));
+    }
+
     const QString inboundToken = takeActivationToken();
 
     QApplication app(argc, argv);
@@ -149,7 +227,7 @@ int main(int argc, char *argv[])
     const bool daemonMode = rawArgs.contains(QStringLiteral("--daemon"));
 
     if (!daemonMode && rawArgs.size() < 2) {
-        err << "usage: lob [--daemon] [--pick] [--list] <url>\n";
+        err << "usage: lob [--daemon] [--pick] [--list] [--explain <url>] <url>\n";
         return 2;
     }
 

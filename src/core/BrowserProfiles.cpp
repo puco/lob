@@ -7,6 +7,7 @@
 #include <QJsonObject>
 #include <QMap>
 #include <QRegularExpression>
+#include <QStandardPaths>
 #include <QTextStream>
 
 namespace Lob
@@ -204,13 +205,26 @@ QStringList geckoDataDirCandidates(const QString &execBasename, const QString &s
 
     QStringList candidates;
     const QString relative = known.value(execBasename);
-    if (!relative.isEmpty()) {
-        candidates << homeDir() + QLatin1Char('/') + relative;
+    if (relative.isEmpty()) {
+        return candidates;
     }
+
+    // Current Firefox on Arch follows the XDG base directory spec and keeps
+    // profiles under $XDG_CONFIG_HOME, not ~/. Both layouts are in the wild --
+    // the same machine can have a stale ~/.mozilla from an older build -- so
+    // the XDG location is checked first and the dot-directory second.
+    const QString xdgConfig = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
+    QString xdgRelative = relative;
+    if (xdgRelative.startsWith(QLatin1Char('.'))) {
+        xdgRelative.remove(0, 1);
+    }
+    candidates << xdgConfig + QLatin1Char('/') + xdgRelative;
+    candidates << homeDir() + QLatin1Char('/') + relative;
 
     // Flatpak relocates the whole home dir under ~/.var/app/<app-id>/.
     const QString appId = QString(storageId).remove(QLatin1String(".desktop"));
-    if (appId.contains(QLatin1Char('.')) && !relative.isEmpty()) {
+    if (appId.contains(QLatin1Char('.'))) {
+        candidates << homeDir() + QLatin1String("/.var/app/") + appId + QLatin1String("/config/") + xdgRelative;
         candidates << homeDir() + QLatin1String("/.var/app/") + appId + QLatin1Char('/') + relative;
     }
     // Snap uses its own layout.

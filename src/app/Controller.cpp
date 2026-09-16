@@ -1,6 +1,8 @@
 #include "Controller.h"
 
 #include "TrayController.h"
+#include "core/RuleEngine.h"
+#include "core/RuleStore.h"
 #include "core/UrlSanitizer.h"
 #include "ui/PickerController.h"
 
@@ -44,8 +46,12 @@ bool Controller::initialize()
     m_engine = new QQmlApplicationEngine(this);
     KLocalization::setupLocalizedContext(m_engine);
 
-    m_picker = new PickerController(this);
+    m_store = new RuleStore(this);
+    m_picker = new PickerController(m_store, this);
     m_picker->refreshTargets();
+
+    // An edit to rules.json outside the app takes effect without a restart.
+    connect(m_store, &RuleStore::changed, m_picker, &PickerController::refreshTargets);
 
     // Building the window now rather than on first use is the whole point of
     // running as a daemon: otherwise the first link after login still pays the
@@ -133,7 +139,18 @@ void Controller::processQueue()
 
     const PendingUrl pending = m_queue.dequeue();
     m_busy = true;
-    m_picker->showFor(pending.url, pending.token);
+
+    if (pending.forcePicker) {
+        m_picker->showPicker(pending.url, pending.token);
+        return;
+    }
+
+    const Decision decision = RuleEngine::decide(pending.url, m_store->rules(), m_store->fallbackTargetId());
+    if (decision.opensWithoutAsking()) {
+        m_picker->showHold(pending.url, pending.token, decision);
+    } else {
+        m_picker->showPicker(pending.url, pending.token);
+    }
 }
 
 void Controller::onPickerFinished()

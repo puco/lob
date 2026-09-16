@@ -251,6 +251,7 @@ QList<Target> TargetRegistry::discover(const QString &ownStorageId)
             if (profiles.size() == 1) {
                 base.profileKey = profiles.constFirst().key;
                 base.profileName = profiles.constFirst().name;
+                base.isDefaultProfile = profiles.constFirst().isDefault;
             }
             targets.append(base);
             continue;
@@ -260,8 +261,9 @@ QList<Target> TargetRegistry::discover(const QString &ownStorageId)
             Target target = base;
             target.profileKey = profile.key;
             target.profileName = profile.name;
+            target.isDefaultProfile = profile.isDefault;
             target.id = storageId + QLatin1Char('#') + profile.key;
-            target.label = base.label + QLatin1String(" — ") + profile.name;
+            target.label = base.label + QStringLiteral(" — ") + profile.name;
             targets.append(target);
         }
     }

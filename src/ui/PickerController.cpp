@@ -1,22 +1,24 @@
 #include "PickerController.h"
 
 #include "TargetModel.h"
+#include "core/RuleStore.h"
 #include "core/Startup.h"
 #include "core/TargetRegistry.h"
 
 #include <LayerShellQt/Window>
 
+#include <KLocalizedString>
 #include <KWindowSystem>
 
 #include <QClipboard>
 #include <QGuiApplication>
+#include <QLoggingCategory>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQuickWindow>
 #include <QScreen>
 #include <QTimer>
-#include <QQuickWindow>
 #include <QWindow>
-#include <QLoggingCategory>
 
 Q_LOGGING_CATEGORY(LOG_PICKER, "lob.picker")
 
@@ -28,10 +30,14 @@ namespace
 /// With KeyboardInteractivityExclusive a picker that fails to hide is a
 /// session-level keyboard trap, so it always gets force-hidden eventually.
 constexpr int kWatchdogMs = 60'000;
+
+/// Holding this while clicking a link overrides whatever rule would fire.
+constexpr Qt::KeyboardModifier kOverrideModifier = Qt::ShiftModifier;
 } // namespace
 
-PickerController::PickerController(QObject *parent)
+PickerController::PickerController(RuleStore *store, QObject *parent)
     : QObject(parent)
+    , m_store(store)
     , m_model(new TargetModel(this))
     , m_launcher(new Launcher(this))
 {
@@ -53,9 +59,86 @@ QString PickerController::displayHost() const
     return m_url.host();
 }
 
+PickerController::Mode PickerController::mode() const
+{
+    return m_mode;
+}
+
+bool PickerController::isHolding() const
+{
+    return m_mode == Mode::Hold;
+}
+
+QString PickerController::holdTitle() const
+{
+    // Composed here rather than in QML: only this side knows whether the
+    // decision opens something or copies it, and "Opening in Copy to
+    // clipboard" is what you get if the caller guesses.
+    if (m_decision.action == RuleAction::Copy) {
+        return i18n("Copying to clipboard");
+    }
+
+    const Target target = targetById(m_decision.targetId);
+    const QString label = target.id.isEmpty() ? m_decision.targetId : target.label;
+    return m_decision.privateWindow ? i18n("Opening in %1 (private)", label) : i18n("Opening in %1", label);
+}
+
+QString PickerController::holdReason() const
+{
+    switch (m_decision.source) {
+    case Decision::Source::Rule:
+        return i18n("matched a rule");
+    case Decision::Source::Memory:
+        return i18n("remembered for %1", m_url.host());
+    case Decision::Source::Fallback:
+        return i18n("default target");
+    case Decision::Source::Ask:
+        return {};
+    }
+    return {};
+}
+
+int PickerController::holdMs() const
+{
+    return m_store ? m_store->holdMs() : 600;
+}
+
+bool PickerController::isRemembered() const
+{
+    return m_store && m_store->hasMemory(m_url.host());
+}
+
+bool PickerController::hasTargets() const
+{
+    return m_model->rowCount() > 0;
+}
+
+Target PickerController::targetById(const QString &id) const
+{
+    const auto &targets = m_model->targets();
+    for (const Target &target : targets) {
+        if (target.id == id) {
+            return target;
+        }
+    }
+    return {};
+}
+
 void PickerController::refreshTargets()
 {
-    m_model->setTargets(TargetRegistry::discover(QStringLiteral(LOB_APP_ID ".desktop")));
+    auto targets = TargetRegistry::discover(QStringLiteral(LOB_APP_ID ".desktop"));
+
+    // Handlers that are not browsers stay hidden until explicitly enabled, but
+    // they are never filtered out of discovery -- whether routing a link to one
+    // is useful is the user's call, not ours.
+    if (m_store) {
+        const QStringList enabled = m_store->enabledOtherHandlers();
+        targets.removeIf([&enabled](const Target &target) {
+            return target.kind != TargetKind::Browser && !enabled.contains(target.id);
+        });
+    }
+
+    m_model->setTargets(targets);
 }
 
 bool PickerController::ensureWindow(QQmlApplicationEngine *engine)
@@ -76,16 +159,12 @@ bool PickerController::ensureWindow(QQmlApplicationEngine *engine)
         return false;
     }
 
-    // Layer-shell is what lets the picker take the keyboard unconditionally
+    // Exclusive keyboard is what lets the picker take input unconditionally
     // instead of losing a focus-stealing-prevention argument with the browser
-    // that is about to open. On X11 there is no such protocol, so we fall back
-    // to an ordinary always-on-top window.
-    // Exclusive keyboard is unforgiving while iterating on the UI: a QML error
-    // that leaves the overlay up takes the session's keyboard with it. This
-    // escape hatch runs the picker as an ordinary window instead.
+    // that is about to open. It is also what makes the held-modifier check
+    // below possible at all. X11 has no such protocol, so fall back.
     const bool noLayerShell = qEnvironmentVariableIsSet("LOB_NO_LAYERSHELL");
     LayerShellQt::Window *layer = noLayerShell ? nullptr : LayerShellQt::Window::get(m_window);
-
 
     if (layer) {
         layer->setLayer(LayerShellQt::Window::LayerOverlay);
@@ -99,14 +178,44 @@ bool PickerController::ensureWindow(QQmlApplicationEngine *engine)
         m_window->setFlags(m_window->flags() | Qt::Dialog | Qt::WindowStaysOnTopHint);
     }
 
+    connect(m_window, &QWindow::activeChanged, this, [this] {
+        if (m_window->isActive()) {
+            checkHeldModifiers();
+        }
+    });
+
     return true;
 }
 
-void PickerController::showFor(const QUrl &url, const QString &activationToken)
+void PickerController::showPicker(const QUrl &url, const QString &activationToken)
+{
+    m_url = url;
+    m_mode = Mode::Picker;
+    m_decision = {};
+    present(activationToken);
+}
+
+void PickerController::showHold(const QUrl &url, const QString &activationToken, const Decision &decision)
+{
+    m_url = url;
+    m_decision = decision;
+
+    // A zero hold is a deliberate "stop asking me": carry it out at once rather
+    // than flashing an overlay that cannot be read, let alone reacted to.
+    if (holdMs() <= 0) {
+        runDecision();
+        Q_EMIT finished();
+        return;
+    }
+
+    m_mode = Mode::Hold;
+    present(activationToken);
+}
+
+void PickerController::present(const QString &activationToken)
 {
     m_showTimer.start();
-    m_url = url;
-    Q_EMIT urlChanged();
+    Q_EMIT contextChanged();
 
     if (!m_window) {
         return;
@@ -116,7 +225,6 @@ void PickerController::showFor(const QUrl &url, const QString &activationToken)
         m_window->setGeometry(screen->geometry());
     }
 
-    qCDebug(LOG_PICKER) << "showFor" << url.toString() << "window" << m_window;
     // Time to the first presented frame is the number that matters: it is what
     // the user experiences between clicking a link and being asked.
     if (auto *quick = qobject_cast<QQuickWindow *>(m_window)) {
@@ -125,8 +233,8 @@ void PickerController::showFor(const QUrl &url, const QString &activationToken)
             &QQuickWindow::frameSwapped,
             this,
             [this] {
-                qCDebug(LOG_PICKER) << "picker painted in" << m_showTimer.elapsed()
-                                      << "ms; since process start" << startupTimer().elapsed() << "ms";
+                qCDebug(LOG_PICKER) << "painted in" << m_showTimer.elapsed() << "ms; since process start"
+                                    << startupTimer().elapsed() << "ms";
             },
             Qt::SingleShotConnection);
     }
@@ -140,16 +248,74 @@ void PickerController::showFor(const QUrl &url, const QString &activationToken)
 
     QTimer::singleShot(kWatchdogMs, this, [this] {
         if (m_window && m_window->isVisible()) {
-            qCWarning(LOG_PICKER) << "watchdog fired";
+            qCWarning(LOG_PICKER) << "watchdog fired; force-hiding";
             hidePicker();
             Q_EMIT finished();
         }
     });
 }
 
-bool PickerController::hasTargets() const
+void PickerController::checkHeldModifiers()
 {
-    return m_model->rowCount() > 0;
+    if (m_mode != Mode::Hold) {
+        return;
+    }
+
+    // The modifier is held in the application that opened the link, and a
+    // Wayland client cannot read global modifier state. What it can do is see
+    // which keys were already down when it took keyboard focus -- which is
+    // exactly this moment, and the only point where the gesture is observable.
+    const Qt::KeyboardModifiers held = QGuiApplication::queryKeyboardModifiers();
+    qCDebug(LOG_PICKER) << "modifiers held at focus:" << held;
+
+    if (held.testFlag(kOverrideModifier)) {
+        qCDebug(LOG_PICKER) << "override modifier held; showing the picker instead";
+        interruptHold();
+    }
+}
+
+void PickerController::interruptHold()
+{
+    if (m_mode != Mode::Hold) {
+        return;
+    }
+    m_mode = Mode::Picker;
+    Q_EMIT contextChanged();
+}
+
+void PickerController::holdCompleted()
+{
+    if (m_mode != Mode::Hold) {
+        return;
+    }
+    runDecision();
+    hidePicker();
+    Q_EMIT finished();
+}
+
+void PickerController::runDecision()
+{
+    if (m_decision.action == RuleAction::Copy) {
+        // On Wayland the copying client owns the selection and has to stay
+        // alive to serve it. That holds for the daemon, but a one-shot run
+        // would drop the content the moment it exits unless a clipboard
+        // manager (Plasma runs one) has taken a copy first.
+        QGuiApplication::clipboard()->setText(m_url.toString());
+        qCDebug(LOG_PICKER) << "copied to clipboard; read back:" << QGuiApplication::clipboard()->text();
+        return;
+    }
+
+    const Target target = targetById(m_decision.targetId);
+    if (target.id.isEmpty()) {
+        // The rule names a target that is no longer installed. Asking is the
+        // only honest response; silently picking something else would be worse.
+        qCWarning(LOG_PICKER) << "decision names unknown target" << m_decision.targetId << "- asking instead";
+        m_mode = Mode::Picker;
+        Q_EMIT contextChanged();
+        return;
+    }
+
+    m_launcher->launch(target, m_url, m_decision.privateWindow, m_window);
 }
 
 bool PickerController::launchFallback(const QUrl &url)
@@ -164,15 +330,18 @@ bool PickerController::launchFallback(const QUrl &url)
     return false;
 }
 
-void PickerController::choose(int index, bool privateWindow)
+void PickerController::choose(int index, bool privateWindow, bool remember)
 {
-    qCDebug(LOG_PICKER) << "choose" << index << "private" << privateWindow;
     const Target target = m_model->at(index);
     if (target.id.isEmpty()) {
         return;
     }
 
-    // Mint the outbound token while the picker still holds focus, then hide it.
+    if (remember && m_store) {
+        m_store->remember(m_url.host(), target.id, privateWindow);
+    }
+
+    // Mint the outbound activation token while the picker still holds focus.
     m_launcher->launch(target, m_url, privateWindow, m_window);
     hidePicker();
     Q_EMIT finished();
@@ -180,7 +349,6 @@ void PickerController::choose(int index, bool privateWindow)
 
 void PickerController::copyUrl()
 {
-    qCDebug(LOG_PICKER) << "copyUrl";
     QGuiApplication::clipboard()->setText(m_url.toString());
     hidePicker();
     Q_EMIT finished();
@@ -188,7 +356,6 @@ void PickerController::copyUrl()
 
 void PickerController::cancel()
 {
-    qCDebug(LOG_PICKER) << "cancel";
     hidePicker();
     Q_EMIT finished();
 }

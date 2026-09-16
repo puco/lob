@@ -40,6 +40,7 @@ struct Target {
     // Empty for the browser's own default profile.
     QString profileKey;  // Chromium: directory name. Gecko: absolute profile path.
     QString profileName; // display name
+    bool isDefaultProfile = false;
 
     // Taken from the entry's own new-private-window action where it has one,
     // because the flag is vendor-specific: Edge says --inprivate, Chrome says

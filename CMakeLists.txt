@@ -12,6 +12,7 @@ include(KDEInstallDirs)
 include(KDECMakeSettings)
 include(KDECompilerSettings NO_POLICY_SCOPE)
 include(ECMQmlModule)
+include(ECMMarkAsTest)
 include(FeatureSummary)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -34,17 +35,37 @@ find_package(LayerShellQt REQUIRED)
 # DBusActivatable silently falls back to Exec=.
 set(LOB_APP_ID "io.github.puco.lob")
 
+# The routing logic lives in a library so the tests exercise exactly the code
+# the application runs, rather than a recompiled copy of it.
+add_library(lobcore STATIC
+    src/core/BrowserProfiles.cpp
+    src/core/Launcher.cpp
+    src/core/RuleEngine.cpp
+    src/core/RuleStore.cpp
+    src/core/Startup.cpp
+    src/core/TargetRegistry.cpp
+    src/core/UrlSanitizer.cpp
+)
+
+target_include_directories(lobcore PUBLIC src)
+
+target_compile_definitions(lobcore PUBLIC
+    LOB_APP_ID="${LOB_APP_ID}"
+    LOB_VERSION="${PROJECT_VERSION}"
+)
+
+target_link_libraries(lobcore PUBLIC
+    Qt6::Core Qt6::Gui Qt6::Network
+    KF6::CoreAddons KF6::I18n KF6::ConfigCore
+    KF6::Service KF6::KIOGui KF6::WindowSystem
+)
+
 add_executable(lob)
 
 target_sources(lob PRIVATE
     src/main.cpp
     src/app/Controller.cpp
     src/app/TrayController.cpp
-    src/core/BrowserProfiles.cpp
-    src/core/Launcher.cpp
-    src/core/Startup.cpp
-    src/core/TargetRegistry.cpp
-    src/core/UrlSanitizer.cpp
     src/ui/PickerController.cpp
     src/ui/TargetModel.cpp
 )
@@ -52,6 +73,7 @@ target_sources(lob PRIVATE
 target_include_directories(lob PRIVATE src)
 
 target_link_libraries(lob PRIVATE
+    lobcore
     Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Widgets
     Qt6::Network Qt6::DBus
     KF6::CoreAddons KF6::I18n KF6::I18nQml KF6::ConfigCore KF6::ConfigGui
@@ -59,11 +81,6 @@ target_link_libraries(lob PRIVATE
     KF6::WindowSystem KF6::IconThemes KF6::ColorScheme
     KF6::Crash KF6::Notifications KF6::StatusNotifierItem
     LayerShellQt::Interface
-)
-
-target_compile_definitions(lob PRIVATE
-    LOB_APP_ID="${LOB_APP_ID}"
-    LOB_VERSION="${PROJECT_VERSION}"
 )
 
 ecm_add_qml_module(lob
@@ -100,5 +117,8 @@ endif()
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/lob.service
         DESTINATION ${LOB_SYSTEMD_UNIT_DIR})
+
+enable_testing()
+add_subdirectory(tests)
 
 feature_summary(WHAT ALL INCLUDE_QUIET_PACKAGES FATAL_ON_MISSING_REQUIRED_PACKAGES)
