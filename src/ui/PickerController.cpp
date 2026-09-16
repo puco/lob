@@ -1,6 +1,7 @@
 #include "PickerController.h"
 
 #include "TargetModel.h"
+#include "core/Startup.h"
 #include "core/TargetRegistry.h"
 
 #include <LayerShellQt/Window>
@@ -13,6 +14,7 @@
 #include <QQmlContext>
 #include <QScreen>
 #include <QTimer>
+#include <QQuickWindow>
 #include <QWindow>
 #include <QLoggingCategory>
 
@@ -53,22 +55,7 @@ QString PickerController::displayHost() const
 
 void PickerController::refreshTargets()
 {
-    auto all = TargetRegistry::discover(QStringLiteral(LOB_APP_ID ".desktop"));
-
-    // Browsers first; everything else is opt-in and sorts below them.
-    QList<Target> ordered;
-    for (const Target &target : std::as_const(all)) {
-        if (target.kind == TargetKind::Browser) {
-            ordered.append(target);
-        }
-    }
-    for (const Target &target : std::as_const(all)) {
-        if (target.kind != TargetKind::Browser) {
-            ordered.append(target);
-        }
-    }
-
-    m_model->setTargets(ordered);
+    m_model->setTargets(TargetRegistry::discover(QStringLiteral(LOB_APP_ID ".desktop")));
 }
 
 bool PickerController::ensureWindow(QQmlApplicationEngine *engine)
@@ -117,6 +104,7 @@ bool PickerController::ensureWindow(QQmlApplicationEngine *engine)
 
 void PickerController::showFor(const QUrl &url, const QString &activationToken)
 {
+    m_showTimer.start();
     m_url = url;
     Q_EMIT urlChanged();
 
@@ -129,6 +117,20 @@ void PickerController::showFor(const QUrl &url, const QString &activationToken)
     }
 
     qCDebug(LOG_PICKER) << "showFor" << url.toString() << "window" << m_window;
+    // Time to the first presented frame is the number that matters: it is what
+    // the user experiences between clicking a link and being asked.
+    if (auto *quick = qobject_cast<QQuickWindow *>(m_window)) {
+        connect(
+            quick,
+            &QQuickWindow::frameSwapped,
+            this,
+            [this] {
+                qCDebug(LOG_PICKER) << "picker painted in" << m_showTimer.elapsed()
+                                      << "ms; since process start" << startupTimer().elapsed() << "ms";
+            },
+            Qt::SingleShotConnection);
+    }
+
     m_window->show();
 
     if (!activationToken.isEmpty()) {
@@ -143,6 +145,23 @@ void PickerController::showFor(const QUrl &url, const QString &activationToken)
             Q_EMIT finished();
         }
     });
+}
+
+bool PickerController::hasTargets() const
+{
+    return m_model->rowCount() > 0;
+}
+
+bool PickerController::launchFallback(const QUrl &url)
+{
+    const auto &targets = m_model->targets();
+    for (const Target &target : targets) {
+        if (target.kind == TargetKind::Browser) {
+            m_launcher->launch(target, url, false, m_window);
+            return true;
+        }
+    }
+    return false;
 }
 
 void PickerController::choose(int index, bool privateWindow)

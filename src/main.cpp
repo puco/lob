@@ -1,17 +1,17 @@
-#include "core/Target.h"
+#include "app/Controller.h"
 #include "core/Launcher.h"
+#include "core/Startup.h"
+#include "core/Target.h"
 #include "core/TargetRegistry.h"
-#include "core/UrlSanitizer.h"
-#include "ui/PickerController.h"
 
 #include <QApplication>
-#include <QQmlApplicationEngine>
 #include <QQuickStyle>
 #include <QTextStream>
 #include <QUrl>
 
 #include <KAboutData>
-#include <KLocalizedQmlContext>
+#include <KCrash>
+#include <KDBusService>
 #include <KLocalizedString>
 
 namespace
@@ -79,22 +79,24 @@ int runList()
     return 0;
 }
 
-QUrl urlFromArgs(const QStringList &args)
+/// KDBusService hands us the inbound activation token via the environment and
+/// clears it once the signal returns, so it has to be taken synchronously --
+/// any queued call or nested event loop would lose it.
+QString takeActivationToken()
 {
-    for (int i = 1; i < args.size(); ++i) {
-        const QString &arg = args.at(i);
-        if (arg.startsWith(QLatin1String("--"))) {
-            continue;
-        }
-        return QUrl::fromUserInput(arg);
+    const QString token = qEnvironmentVariable("XDG_ACTIVATION_TOKEN");
+    if (!token.isEmpty()) {
+        qunsetenv("XDG_ACTIVATION_TOKEN");
     }
-    return {};
+    return token;
 }
 
 } // namespace
 
 int main(int argc, char *argv[])
 {
+    Lob::startupTimer().start();
+
     const QStringList rawArgs = [argc, argv] {
         QStringList args;
         args.reserve(argc);
@@ -112,10 +114,7 @@ int main(int argc, char *argv[])
         return runList();
     }
 
-    // Snapshot the inbound activation token before anything else can consume
-    // or clobber it; it is single-use and belongs to this URL.
-    const QString inboundToken = qEnvironmentVariable("XDG_ACTIVATION_TOKEN");
-    qunsetenv("XDG_ACTIVATION_TOKEN");
+    const QString inboundToken = takeActivationToken();
 
     QApplication app(argc, argv);
     setupIdentity();
@@ -126,43 +125,56 @@ int main(int argc, char *argv[])
                      QStringLiteral(LOB_VERSION),
                      i18n("Routes links to the right browser"),
                      KAboutLicense::GPL_V3);
-    // Must be set on the KAboutData itself: setApplicationData overwrites
-    // QGuiApplication's desktopFileName with "org.kde.<component>" otherwise,
-    // which breaks the portal registration and the derived D-Bus name.
+    // Both of these must be set on the KAboutData itself, because
+    // setApplicationData overwrites what setupIdentity() put on
+    // QCoreApplication. KAboutData defaults organizationDomain to "kde.org",
+    // which silently yields the bus name org.kde.lob -- and a bus name that
+    // does not match the .desktop basename means D-Bus activation never
+    // reaches us and every link falls back to the Exec= line instead.
+    about.setOrganizationDomain(QByteArrayLiteral("puco.github.io"));
     about.setDesktopFileName(QStringLiteral(LOB_APP_ID));
     KAboutData::setApplicationData(about);
+    KCrash::initialize();
 
     QTextStream err(stderr);
 
-    const QUrl url = urlFromArgs(rawArgs);
-    if (url.isEmpty()) {
-        err << "usage: lob [--list] <url>\n";
+    // Registering before doing any real work means a second `lob <url>` hands
+    // its arguments to the running daemon and exits without ever building a
+    // QML engine.
+    KDBusService service(KDBusService::Unique);
+    if (!service.isRegistered()) {
+        return 0;
+    }
+
+    const bool daemonMode = rawArgs.contains(QStringLiteral("--daemon"));
+
+    if (!daemonMode && rawArgs.size() < 2) {
+        err << "usage: lob [--daemon] [--pick] [--list] <url>\n";
         return 2;
     }
 
-    QString reason;
-    if (!Lob::UrlSanitizer::isRoutable(url, &reason)) {
-        err << reason << '\n';
-        return 2;
-    }
+    Lob::Controller controller;
+    controller.setDaemonMode(daemonMode);
 
-    QQmlApplicationEngine engine;
-    KLocalization::setupLocalizedContext(&engine);
-
-    Lob::PickerController controller;
-    controller.refreshTargets();
-
-    if (!controller.ensureWindow(&engine)) {
+    if (!controller.initialize()) {
         err << "Failed to build the picker window.\n";
         return 1;
     }
 
-    QObject::connect(&controller, &Lob::PickerController::errorOccurred, &app, [&err](const QString &message) {
-        err << message << '\n';
+    QObject::connect(&service, &KDBusService::activateRequested, &controller,
+                     [&controller](const QStringList &args, const QString &) {
+                         controller.handleArgs(args, takeActivationToken());
+                     });
+    QObject::connect(&service, &KDBusService::openRequested, &controller, [&controller](const QList<QUrl> &urls) {
+        controller.handleUrls(urls, takeActivationToken());
     });
-    QObject::connect(&controller, &Lob::PickerController::finished, &app, &QCoreApplication::quit);
 
-    controller.showFor(url, inboundToken);
+    controller.handleArgs(rawArgs, inboundToken);
+
+    // A one-shot invocation with nothing routable left has no reason to linger.
+    if (!daemonMode && !controller.isBusy()) {
+        return 2;
+    }
 
     return app.exec();
 }

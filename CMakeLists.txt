@@ -38,8 +38,11 @@ add_executable(lob)
 
 target_sources(lob PRIVATE
     src/main.cpp
+    src/app/Controller.cpp
+    src/app/TrayController.cpp
     src/core/BrowserProfiles.cpp
     src/core/Launcher.cpp
+    src/core/Startup.cpp
     src/core/TargetRegistry.cpp
     src/core/UrlSanitizer.cpp
     src/ui/PickerController.cpp
@@ -73,5 +76,29 @@ ecm_target_qml_sources(lob SOURCES
 )
 
 install(TARGETS lob ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
+
+# Absolute path: Exec= and ExecStart= are resolved by the desktop environment
+# and by systemd, neither of which necessarily has ~/.local/bin on PATH.
+set(LOB_BIN "${CMAKE_INSTALL_PREFIX}/${KDE_INSTALL_BINDIR}/lob")
+
+configure_file(data/${LOB_APP_ID}.desktop.in ${CMAKE_CURRENT_BINARY_DIR}/${LOB_APP_ID}.desktop @ONLY)
+configure_file(data/${LOB_APP_ID}.service.in ${CMAKE_CURRENT_BINARY_DIR}/${LOB_APP_ID}.service @ONLY)
+configure_file(data/lob.service.in ${CMAKE_CURRENT_BINARY_DIR}/lob.service @ONLY)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${LOB_APP_ID}.desktop
+        DESTINATION ${KDE_INSTALL_APPDIR})
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${LOB_APP_ID}.service
+        DESTINATION ${KDE_INSTALL_DBUSSERVICEDIR})
+# systemd reads user units from <libdir>/systemd/user only under a system
+# prefix; for a per-user prefix the searched location is <datadir>/systemd/user.
+# KDE_INSTALL_SYSTEMDUSERUNITDIR always gives the former, so pick by prefix.
+if(CMAKE_INSTALL_PREFIX STREQUAL "/usr" OR CMAKE_INSTALL_PREFIX STREQUAL "/usr/local")
+    set(LOB_SYSTEMD_UNIT_DIR ${KDE_INSTALL_SYSTEMDUSERUNITDIR})
+else()
+    set(LOB_SYSTEMD_UNIT_DIR ${KDE_INSTALL_DATAROOTDIR}/systemd/user)
+endif()
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/lob.service
+        DESTINATION ${LOB_SYSTEMD_UNIT_DIR})
 
 feature_summary(WHAT ALL INCLUDE_QUIET_PACKAGES FATAL_ON_MISSING_REQUIRED_PACKAGES)

@@ -5,6 +5,7 @@
 
 #include <QAbstractItemModel>
 #include <QObject>
+#include <QElapsedTimer>
 #include <QUrl>
 
 class QQmlApplicationEngine;
@@ -38,6 +39,12 @@ public:
 
     void showFor(const QUrl &url, const QString &activationToken);
 
+    /// Opens @p url in the first browser target, without asking. Used when
+    /// routing is paused, so links keep working instead of piling up.
+    bool launchFallback(const QUrl &url);
+
+    bool hasTargets() const;
+
     Q_INVOKABLE void choose(int index, bool privateWindow);
     Q_INVOKABLE void copyUrl();
     Q_INVOKABLE void cancel();
@@ -54,6 +61,7 @@ private:
     Launcher *m_launcher;
     QWindow *m_window = nullptr;
     QUrl m_url;
+    QElapsedTimer m_showTimer;
 };
 
 } // namespace Lob

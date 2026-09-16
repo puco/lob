@@ -11,6 +11,8 @@
 #include <QSet>
 #include <QStandardPaths>
 
+#include <algorithm>
+
 namespace Lob
 {
 
@@ -263,6 +265,23 @@ QList<Target> TargetRegistry::discover(const QString &ownStorageId)
             targets.append(target);
         }
     }
+
+    // Browsers first; other handlers are opt-in and sort below them.
+    //
+    // Within each group the order is alphabetical rather than whatever
+    // KApplicationTrader returned: that is sorted by mimeapps preference and
+    // shifts as associations change, which would silently reassign the picker's
+    // digit shortcuts between one link and the next. A shortcut you cannot
+    // trust is worse than no shortcut.
+    std::sort(targets.begin(), targets.end(), [](const Target &a, const Target &b) {
+        const bool aBrowser = a.kind == TargetKind::Browser;
+        const bool bBrowser = b.kind == TargetKind::Browser;
+        if (aBrowser != bBrowser) {
+            return aBrowser;
+        }
+        const int byLabel = a.label.localeAwareCompare(b.label);
+        return byLabel != 0 ? byLabel < 0 : a.id < b.id;
+    });
 
     return targets;
 }

@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Lob
+GenericName=Link Router
+Comment=Choose which browser opens each link
+Exec=@LOB_BIN@ %u
+TryExec=@LOB_BIN@
+Icon=internet-web-browser
+Terminal=false
+StartupNotify=true
+DBusActivatable=true
+Categories=Network;Utility;Qt;KDE;
+MimeType=x-scheme-handler/http;x-scheme-handler/https;
+Keywords=browser;link;url;open with;default browser;

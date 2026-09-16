@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=io.github.puco.lob
+Exec=@LOB_BIN@ --daemon
+SystemdService=lob.service
