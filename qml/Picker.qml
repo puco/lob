@@ -176,6 +176,13 @@ Window {
             // leaves the remainder as dead space on the right, which reads as a
             // layout bug even though the cells themselves are correct.
             Kirigami.Card {
+                id: pickerCard
+
+                // Kirigami.AbstractCard defaults Layout.fillWidth to true,
+                // which silently overrides the alignment and stretches the card
+                // across the whole overlay. Turning it off is what actually
+                // makes the card hug its cells.
+                Layout.fillWidth: false
                 Layout.alignment: Qt.AlignHCenter
                 visible: !picker.holding
 
