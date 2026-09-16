@@ -23,7 +23,7 @@ jobs:
             kirigami kirigami-addons ki18n kcoreaddons kconfig kdbusaddons \
             knotifications kwindowsystem kiconthemes kcolorscheme kcrash \
             kstatusnotifieritem kservice kio layer-shell-qt qqc2-desktop-style \
-            appstream
+            appstream desktop-file-utils
 
       - uses: actions/checkout@v4
 
