@@ -27,7 +27,7 @@ jobs:
             kirigami kirigami-addons ki18n kcoreaddons kconfig kdbusaddons \
             knotifications kwindowsystem kiconthemes kcolorscheme kcrash \
             kstatusnotifieritem kservice kio layer-shell-qt qqc2-desktop-style \
-            appstream github-cli
+            appstream desktop-file-utils github-cli
 
       - uses: actions/checkout@v4
         with:
@@ -51,13 +51,6 @@ jobs:
       - name: Check version consistency
         run: ./packaging/check-version.sh
 
-      - name: Build and test
-        run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_TESTING=ON
-          cmake --build build
-          ctest --test-dir build --output-on-failure
-
       - name: Create source tarball
         id: tarball
         run: |
@@ -77,6 +70,12 @@ jobs:
           useradd -m builder && chown -R builder aur-lob
           su builder -c "cd aur-lob && makepkg --printsrcinfo > .SRCINFO"
           tar czf aur-lob.tar.gz -C aur-lob PKGBUILD .SRCINFO
+
+      - name: Build, test and validate the exact release package
+        run: |
+          mkdir package-check
+          chown builder package-check
+          su builder -c "bash '$PWD/packaging/check-package.sh' '$PWD/${{ steps.tarball.outputs.name }}.tar.gz' '$PWD/aur-lob/PKGBUILD' '$PWD/package-check'"
 
       - name: Publish release
         env:

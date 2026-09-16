@@ -41,7 +41,8 @@ lob --set-default
 
 ## Build from source
 
-Needs Qt 6, KDE Frameworks 6 and `extra-cmake-modules`. On Arch:
+Needs Qt 6.6+, KDE Frameworks 6.19+, layer-shell-qt 6.6+ and
+`extra-cmake-modules`. Dependencies may themselves require a newer Qt. On Arch:
 
 ```bash
 sudo pacman -S --needed extra-cmake-modules cmake ninja qt6-base qt6-declarative qt6-svg \

@@ -14,19 +14,19 @@ pkgbase = lob-git
 	depends = qt6-svg
 	depends = kirigami
 	depends = kirigami-addons
-	depends = ki18n
+	depends = ki18n>=6.19
 	depends = kcoreaddons
 	depends = kconfig
 	depends = kdbusaddons
 	depends = knotifications
-	depends = kwindowsystem
+	depends = kwindowsystem>=6.19
 	depends = kiconthemes
 	depends = kcolorscheme
 	depends = kcrash
 	depends = kstatusnotifieritem
 	depends = kservice
 	depends = kio
-	depends = layer-shell-qt
+	depends = layer-shell-qt>=6.6
 	depends = qqc2-desktop-style
 	provides = lob=0.1
 	conflicts = lob

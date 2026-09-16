@@ -9,9 +9,9 @@ url="https://github.com/puco/lob"
 license=('MIT')
 depends=(
   'qt6-base' 'qt6-declarative' 'qt6-svg'
-  'kirigami' 'kirigami-addons' 'ki18n' 'kcoreaddons' 'kconfig' 'kdbusaddons'
-  'knotifications' 'kwindowsystem' 'kiconthemes' 'kcolorscheme' 'kcrash'
-  'kstatusnotifieritem' 'kservice' 'kio' 'layer-shell-qt' 'qqc2-desktop-style'
+  'kirigami' 'kirigami-addons' 'ki18n>=6.19' 'kcoreaddons' 'kconfig' 'kdbusaddons'
+  'knotifications' 'kwindowsystem>=6.19' 'kiconthemes' 'kcolorscheme' 'kcrash'
+  'kstatusnotifieritem' 'kservice' 'kio' 'layer-shell-qt>=6.6' 'qqc2-desktop-style'
 )
 makedepends=('cmake' 'ninja' 'extra-cmake-modules' 'git')
 provides=("$_pkgname=${pkgver%%.r*}")

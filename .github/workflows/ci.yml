@@ -10,7 +10,7 @@ jobs:
   build:
     name: Build and test
     runs-on: ubuntu-latest
-    # Arch rather than Ubuntu: Lob needs KDE Frameworks 6.30+ and
+    # Arch rather than Ubuntu: Lob needs KDE Frameworks 6.19+ and
     # layer-shell-qt, which Ubuntu's archives lag well behind.
     container: archlinux:latest
 
@@ -52,6 +52,14 @@ jobs:
         run: |
           desktop-file-validate staging/usr/share/applications/io.github.puco.lob.desktop
           appstreamcli validate --no-net staging/usr/share/metainfo/io.github.puco.lob.metainfo.xml
+
+      - name: Build the release package from this revision
+        run: |
+          version=$(sed -nE 's/^project\(lob VERSION ([0-9.]+).*/\1/p' CMakeLists.txt)
+          git archive --format=tar.gz --prefix="lob-$version/" -o "lob-$version.tar.gz" HEAD
+          useradd -m builder
+          chown -R builder .
+          su builder -c "bash packaging/check-package.sh '$PWD/lob-$version.tar.gz' '$PWD/packaging/aur/lob/PKGBUILD' '$PWD/package-check'"
 
   packaging:
     name: Validate PKGBUILDs

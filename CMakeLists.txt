@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.22)
 project(lob VERSION 0.1 LANGUAGES CXX)
 
 set(QT_MIN_VERSION 6.6.0)
-set(KF_MIN_VERSION 6.0.0)
+set(KF_MIN_VERSION 6.19.0)
 
 find_package(ECM ${KF_MIN_VERSION} REQUIRED NO_MODULE)
 list(APPEND CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
@@ -28,7 +28,7 @@ find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS
     WindowSystem IconThemes ColorScheme Crash Notifications
     StatusNotifierItem)
 
-find_package(LayerShellQt REQUIRED)
+find_package(LayerShellQt 6.6 REQUIRED)
 
 # The app id is load-bearing: the D-Bus name KDBusService derives from
 # organizationDomain + applicationName must equal the .desktop basename, or
@@ -121,7 +121,9 @@ endif()
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/lob.service
         DESTINATION ${LOB_SYSTEMD_UNIT_DIR})
 
-enable_testing()
-add_subdirectory(tests)
+include(CTest)
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
 
 feature_summary(WHAT ALL INCLUDE_QUIET_PACKAGES FATAL_ON_MISSING_REQUIRED_PACKAGES)
