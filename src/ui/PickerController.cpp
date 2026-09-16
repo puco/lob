@@ -202,9 +202,17 @@ void PickerController::showHold(const QUrl &url, const QString &activationToken,
 
     // A zero hold is a deliberate "stop asking me": carry it out at once rather
     // than flashing an overlay that cannot be read, let alone reacted to.
+    // runDecision() signals completion itself, so nothing is emitted here --
+    // doing both would advance the queue twice for one URL.
     if (holdMs() <= 0) {
+        m_mode = Mode::Hold;
         runDecision();
-        Q_EMIT finished();
+        // Unless the rule pointed at a target that no longer exists, in which
+        // case runDecision() falls back to asking and the picker has to appear
+        // after all.
+        if (m_mode == Mode::Picker) {
+            present(activationToken);
+        }
         return;
     }
 
@@ -288,9 +296,10 @@ void PickerController::holdCompleted()
     if (m_mode != Mode::Hold) {
         return;
     }
+    // hidePicker() is deliberately not called here: runDecision() hides the
+    // window itself once the launch has gone through. Unmapping the surface
+    // first loses the activation token that is still being minted from it.
     runDecision();
-    hidePicker();
-    Q_EMIT finished();
 }
 
 void PickerController::runDecision()
@@ -302,6 +311,8 @@ void PickerController::runDecision()
         // manager (Plasma runs one) has taken a copy first.
         QGuiApplication::clipboard()->setText(m_url.toString());
         qCDebug(LOG_PICKER) << "copied to clipboard; read back:" << QGuiApplication::clipboard()->text();
+        hidePicker();
+        Q_EMIT finished();
         return;
     }
 
@@ -315,7 +326,10 @@ void PickerController::runDecision()
         return;
     }
 
-    m_launcher->launch(target, m_url, m_decision.privateWindow, m_window);
+    m_launcher->launch(target, m_url, m_decision.privateWindow, m_window, [this] {
+        hidePicker();
+        Q_EMIT finished();
+    });
 }
 
 bool PickerController::launchFallback(const QUrl &url)
@@ -341,10 +355,13 @@ void PickerController::choose(int index, bool privateWindow, bool remember)
         m_store->remember(m_url.host(), target.id, privateWindow);
     }
 
-    // Mint the outbound activation token while the picker still holds focus.
-    m_launcher->launch(target, m_url, privateWindow, m_window);
-    hidePicker();
-    Q_EMIT finished();
+    // The window stays mapped until the launch has gone through: the
+    // activation token is minted from it asynchronously, and hiding it first
+    // loses the token and with it the browser's claim to the foreground.
+    m_launcher->launch(target, m_url, privateWindow, m_window, [this] {
+        hidePicker();
+        Q_EMIT finished();
+    });
 }
 
 void PickerController::copyUrl()

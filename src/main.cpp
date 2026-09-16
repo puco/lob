@@ -97,10 +97,21 @@ int runExplain(const QString &rawUrl)
 
     Lob::RuleStore store;
     const auto rules = store.rules();
-    const Lob::Decision decision = Lob::RuleEngine::decide(url, rules, store.fallbackTargetId());
+
+    // Routing strips tracking parameters before the rules ever see the URL, so
+    // explaining the raw one would answer a question nobody asked -- and would
+    // differ from what actually happens for any rule matching on the query.
+    const QUrl routed = store.stripTracking()
+        ? Lob::UrlSanitizer::strip(url, store.trackingParameters())
+        : url;
+
+    const Lob::Decision decision = Lob::RuleEngine::decide(routed, rules, store.fallbackTargetId());
 
     out << "url:   " << url.toString() << '\n';
-    out << "host:  " << url.host() << '\n';
+    if (routed != url) {
+        out << "       -> " << routed.toString() << " (tracking parameters stripped)\n";
+    }
+    out << "host:  " << routed.host() << '\n';
     out << "rules: " << rules.size() << " from " << Lob::RuleStore::filePath() << '\n';
     out << '\n';
 
@@ -134,7 +145,7 @@ int runExplain(const QString &rawUrl)
     // "does not work" is that an earlier one already claimed the URL.
     bool shadowedHeader = false;
     for (int i = 0; i < rules.size(); ++i) {
-        if (i == decision.ruleIndex || !Lob::RuleEngine::matches(rules.at(i), url)) {
+        if (i == decision.ruleIndex || !Lob::RuleEngine::matches(rules.at(i), routed)) {
             continue;
         }
         if (!shadowedHeader) {

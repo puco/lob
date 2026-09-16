@@ -3,6 +3,8 @@
 #include "Target.h"
 
 #include <QObject>
+
+#include <functional>
 #include <QStringList>
 #include <QUrl>
 
@@ -22,8 +24,16 @@ public:
      * Opens @p url in @p target. If @p window is a live Wayland window, a fresh
      * activation token is minted from it first so the browser comes to the
      * front instead of being demoted by focus-stealing prevention.
+     *
+     * @param onLaunched invoked once the process has actually been started.
+     *        Minting a token is asynchronous, and @p window has to stay mapped
+     *        until it arrives -- hide it from here, not before.
      */
-    void launch(const Target &target, const QUrl &url, bool privateWindow, QWindow *window);
+    void launch(const Target &target,
+                const QUrl &url,
+                bool privateWindow,
+                QWindow *window,
+                std::function<void()> onLaunched = {});
 
     /// Command line this target would run. Public for testing.
     static QStringList buildArgv(const Target &target, const QUrl &url, bool privateWindow);

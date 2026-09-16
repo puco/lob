@@ -70,7 +70,11 @@ systemctl --user enable --now lob.service
 instead of opening · `Esc` cancel · arrows and `Enter` also work.
 
 Holding **Shift** while clicking a link forces the picker even when a rule
-would have matched. During the hold bar, any key does the same.
+would have matched. During the hold bar, any key or click does the same.
+
+This works because a Wayland client can see which keys were already held when
+it takes keyboard focus, which is the only moment the gesture is observable --
+the modifier is held in the application that opened the link, not in Lob.
 
 ## Configuration
 

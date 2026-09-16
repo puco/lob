@@ -10,6 +10,11 @@ Window {
     property bool rememberChoice: false
     property int current: 0
 
+    // Drains 1 -> 0 across the hold. Drives the bar directly rather than
+    // animating a control's value, so what is on screen is the time actually
+    // left rather than an approximation of it.
+    property real holdProgress: 1
+
     // Caps how wide the overlay content gets on a large screen, and how many
     // target cells fit on one row.
     readonly property int contentWidth:
@@ -40,9 +45,12 @@ Window {
         target: picker
         function onContextChanged() {
             if (picker.holding) {
+                root.holdProgress = 1
                 holdTimer.restart()
+                holdAnimation.restart()
             } else {
                 holdTimer.stop()
+                holdAnimation.stop()
             }
         }
     }
@@ -51,6 +59,16 @@ Window {
         id: holdTimer
         interval: picker.holdMs
         onTriggered: picker.holdCompleted()
+    }
+
+    NumberAnimation {
+        id: holdAnimation
+        target: root
+        property: "holdProgress"
+        from: 1
+        to: 0
+        duration: picker.holdMs
+        easing.type: Easing.Linear
     }
 
     // Deliberately not a theme colour: Kirigami.Theme does not resolve inside a
@@ -156,14 +174,27 @@ Window {
                         font: Kirigami.Theme.smallFont
                     }
 
-                    QQC2.ProgressBar {
-                        Layout.fillWidth: true
-                        from: 0
-                        to: picker.holdMs
-                        value: holdTimer.running ? picker.holdMs : 0
+                    // Drawn rather than a QQC2.ProgressBar: under the desktop
+                    // style that control is painted by QStyle from the widget
+                    // palette, not Kirigami.Theme, so it renders light on this
+                    // dark card no matter what the theme says.
+                    Rectangle {
+                        id: holdTrack
 
-                        Behavior on value {
-                            NumberAnimation { duration: picker.holdMs; easing.type: Easing.Linear }
+                        Layout.fillWidth: true
+                        Layout.topMargin: Kirigami.Units.smallSpacing
+                        implicitHeight: Math.round(Kirigami.Units.smallSpacing * 0.75)
+                        radius: height / 2
+                        color: Qt.rgba(Kirigami.Theme.textColor.r,
+                                       Kirigami.Theme.textColor.g,
+                                       Kirigami.Theme.textColor.b,
+                                       0.15)
+
+                        Rectangle {
+                            height: parent.height
+                            radius: parent.radius
+                            width: parent.width * root.holdProgress
+                            color: Kirigami.Theme.highlightColor
                         }
                     }
                 }

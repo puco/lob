@@ -113,15 +113,27 @@ QStringList Launcher::buildArgv(const Target &target, const QUrl &url, bool priv
     return argv;
 }
 
-void Launcher::launch(const Target &target, const QUrl &url, bool privateWindow, QWindow *window)
+void Launcher::launch(const Target &target,
+                      const QUrl &url,
+                      bool privateWindow,
+                      QWindow *window,
+                      std::function<void()> onLaunched)
 {
+    const auto done = [onLaunched = std::move(onLaunched)] {
+        if (onLaunched) {
+            onLaunched();
+        }
+    };
+
     if (!execIsSafe(target.execPath)) {
         Q_EMIT launchFailed(tr("Refusing to launch %1: not a browser executable.").arg(target.execPath));
+        done();
         return;
     }
 
     if (!window || !KWindowSystem::isPlatformWayland()) {
         doLaunch(target, url, privateWindow, QString());
+        done();
         return;
     }
 
@@ -129,18 +141,27 @@ void Launcher::launch(const Target &target, const QUrl &url, bool privateWindow,
     // so mint a fresh one for the browser. Pass a real app id -- an empty one
     // makes KWin more likely to reject the token.
     const QString appId = QFileInfo(target.storageId).completeBaseName();
-    const quint32 serial = KWaylandExtras::lastInputSerial(window);
 
     auto resolved = QSharedPointer<bool>::create(false);
-    auto finish = [this, target, url, privateWindow, resolved](const QString &token) {
+    auto finish = [this, target, url, privateWindow, resolved, done](const QString &token) {
         if (*resolved) {
             return;
         }
         *resolved = true;
         doLaunch(target, url, privateWindow, token);
+        done();
     };
 
-    KWaylandExtras::xdgActivationToken(window, serial, appId).then(this, finish);
+    // A serial ties the token to a specific input event. The picker has one
+    // because the user clicked or typed in it; the hold bar does not, since
+    // nothing was pressed -- there the serial-less overload is the correct
+    // request, and passing a stale or zero serial instead gets the token
+    // refused and the browser opens behind everything.
+    const quint32 serial = KWaylandExtras::lastInputSerial(window);
+    auto future = serial != 0 ? KWaylandExtras::xdgActivationToken(window, serial, appId)
+                              : KWaylandExtras::xdgActivationToken(window, appId);
+    future.then(this, finish);
+
     QTimer::singleShot(kActivationTokenTimeoutMs, this, [finish] {
         finish(QString());
     });
