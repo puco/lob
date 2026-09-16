@@ -9,6 +9,6 @@ Icon=internet-web-browser
 Terminal=false
 StartupNotify=true
 DBusActivatable=true
-Categories=Network;Utility;Qt;KDE;
+Categories=Network;Qt;KDE;
 MimeType=x-scheme-handler/http;x-scheme-handler/https;
 Keywords=browser;link;url;open with;default browser;

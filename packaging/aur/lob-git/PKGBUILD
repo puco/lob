@@ -1,0 +1,47 @@
+# Maintainer: puco <2155990+puco@users.noreply.github.com>
+pkgname=lob-git
+_pkgname=lob
+pkgver=0.1.r0.g0000000
+pkgrel=1
+pkgdesc="Choose which browser opens each link (development version)"
+arch=('x86_64')
+url="https://github.com/puco/lob"
+license=('MIT')
+depends=(
+  'qt6-base' 'qt6-declarative' 'qt6-svg'
+  'kirigami' 'kirigami-addons' 'ki18n' 'kcoreaddons' 'kconfig' 'kdbusaddons'
+  'knotifications' 'kwindowsystem' 'kiconthemes' 'kcolorscheme' 'kcrash'
+  'kstatusnotifieritem' 'kservice' 'kio' 'layer-shell-qt' 'qqc2-desktop-style'
+)
+makedepends=('cmake' 'ninja' 'extra-cmake-modules' 'git')
+provides=("$_pkgname=${pkgver%%.r*}")
+conflicts=("$_pkgname")
+source=("$_pkgname::git+$url.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$_pkgname"
+  git describe --long --tags --abbrev=7 2>/dev/null \
+    | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g' \
+    || printf "0.0.r%s.g%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+}
+
+build() {
+  cmake -B build -S "$_pkgname" -G Ninja \
+    -DCMAKE_BUILD_TYPE=None \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DBUILD_TESTING=ON
+  cmake --build build
+}
+
+check() {
+  ctest --test-dir build --output-on-failure
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+
+  # MIT is not one of the common licences shipped by the licenses package,
+  # so it has to be installed per-package.
+  install -Dm644 "$_pkgname/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

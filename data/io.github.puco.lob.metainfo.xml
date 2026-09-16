@@ -2,10 +2,14 @@
 <component type="desktop-application">
   <id>io.github.puco.lob</id>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>GPL-3.0-or-later</project_license>
+  <project_license>MIT</project_license>
 
   <name>Lob</name>
   <summary>Choose which browser opens each link</summary>
+
+  <developer id="io.github.puco">
+    <name>puco</name>
+  </developer>
 
   <description>
     <p>
@@ -27,6 +31,10 @@
 
   <launchable type="desktop-id">io.github.puco.lob.desktop</launchable>
 
+  <url type="homepage">https://github.com/puco/lob</url>
+  <url type="bugtracker">https://github.com/puco/lob/issues</url>
+  <url type="vcs-browser">https://github.com/puco/lob</url>
+
   <categories>
     <category>Network</category>
     <category>Utility</category>
@@ -46,7 +54,7 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
-    <release version="0.1.0" date="2026-09-16">
+    <release version="0.1" date="2026-09-16">
       <description>
         <p>First working version: browser and profile discovery, a keyboard-driven
         picker, rules with a hold bar, and a resident daemon.</p>

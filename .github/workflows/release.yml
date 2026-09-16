@@ -1,0 +1,114 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.1)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+
+    steps:
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm --needed \
+            base-devel git cmake ninja extra-cmake-modules \
+            qt6-base qt6-declarative qt6-svg \
+            kirigami kirigami-addons ki18n kcoreaddons kconfig kdbusaddons \
+            knotifications kwindowsystem kiconthemes kcolorscheme kcrash \
+            kstatusnotifieritem kservice kio layer-shell-qt qqc2-desktop-style \
+            appstream github-cli
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        run: |
+          git config --global --add safe.directory "$PWD"
+          tag="${{ inputs.tag || github.ref_name }}"
+          version="${tag#v}"
+          declared=$(sed -nE 's/^project\(lob VERSION ([0-9.]+).*/\1/p' CMakeLists.txt)
+          if [[ "$version" != "$declared" ]]; then
+            echo "::error::tag $tag does not match the version in CMakeLists.txt ($declared)"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check version consistency
+        run: ./packaging/check-version.sh
+
+      - name: Build and test
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_TESTING=ON
+          cmake --build build
+          ctest --test-dir build --output-on-failure
+
+      - name: Create source tarball
+        id: tarball
+        run: |
+          name="lob-${{ steps.version.outputs.version }}"
+          # git archive, not the GitHub auto-generated archive: this one is
+          # produced once, uploaded once, and its checksum never moves.
+          git archive --format=tar.gz --prefix="$name/" \
+            -o "$name.tar.gz" "${{ steps.version.outputs.tag }}"
+          sha=$(sha256sum "$name.tar.gz" | cut -d' ' -f1)
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Stage the AUR package with a real checksum
+        run: |
+          cp -r packaging/aur/lob aur-lob
+          sed -i "s|^sha256sums=.*|sha256sums=('${{ steps.tarball.outputs.sha256 }}')|" aur-lob/PKGBUILD
+          useradd -m builder && chown -R builder aur-lob
+          su builder -c "cd aur-lob && makepkg --printsrcinfo > .SRCINFO"
+          tar czf aur-lob.tar.gz -C aur-lob PKGBUILD .SRCINFO
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<EOF
+          ## Install
+
+          From the AUR:
+
+          \`\`\`bash
+          paru -S lob        # or: yay -S lob
+          \`\`\`
+
+          Then make it your link handler:
+
+          \`\`\`bash
+          systemctl --user enable --now lob.service
+          lob --set-default
+          \`\`\`
+
+          \`lob --restore-default\` undoes that at any time.
+
+          ## Source tarball checksum
+
+          \`\`\`
+          ${{ steps.tarball.outputs.sha256 }}  ${{ steps.tarball.outputs.name }}.tar.gz
+          \`\`\`
+          EOF
+
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "Lob ${{ steps.version.outputs.version }}" \
+            --notes-file notes.md \
+            "${{ steps.tarball.outputs.name }}.tar.gz" \
+            "aur-lob.tar.gz#AUR package (PKGBUILD + .SRCINFO, checksum filled in)"

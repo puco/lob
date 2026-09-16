@@ -245,7 +245,7 @@ int main(int argc, char *argv[])
                      i18n("Lob"),
                      QStringLiteral(LOB_VERSION),
                      i18n("Routes links to the right browser"),
-                     KAboutLicense::GPL_V3);
+                     KAboutLicense::MIT);
     // Both of these must be set on the KAboutData itself, because
     // setApplicationData overwrites what setupIdentity() put on
     // QCoreApplication. KAboutData defaults organizationDomain to "kde.org",

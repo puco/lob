@@ -10,7 +10,24 @@ everything to one default browser.
 - `http` and `https` only. Not mail links, not local files, not PDFs. URLs
   carrying credentials (`https://user:pw@host/`) are refused outright.
 
-## Build
+## Install
+
+From the AUR:
+
+```bash
+paru -S lob        # or lob-git to track main
+```
+
+Then start the daemon and claim the link handler:
+
+```bash
+systemctl --user enable --now lob.service
+lob --set-default
+```
+
+`lob --restore-default` puts your previous browser back at any time.
+
+## Build from source
 
 Needs Qt 6, KDE Frameworks 6 and `extra-cmake-modules`. On Arch:
 
@@ -104,3 +121,38 @@ routing a link to one is useful is your call.
   on the UI.
 - If `~/.config/kde-mimeapps.list` sets an http/https default it outranks the
   registration Lob writes; `lob --status` warns when that is the case.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
+
+Lob links against Qt and KDE Frameworks, which are LGPL; dynamic linking from
+MIT-licensed code is fine, and those libraries keep their own terms.
+
+## How this was built
+
+Lob was written in a single session with [Claude Code](https://claude.com/claude-code),
+using Claude Opus 5. That is worth stating plainly rather than leaving for
+someone to infer from the commit log.
+
+What that meant in practice:
+
+- The architecture was settled in conversation. The choices that shaped
+  everything else — a resident daemon over per-click startup, Kirigami over
+  QtWidgets, `http`/`https` only, what v1 would and would not include — were
+  decisions I made from options put to me, not defaults it picked.
+- Claude wrote the code, ran the builds and tests, and drove most of the
+  verification itself: CLI output, D-Bus introspection, latency measurements,
+  and screenshots of the running overlay.
+- Several design errors were caught by that testing rather than by review.
+  Classification originally required finding a browser's profile store, which
+  demoted a never-launched Firefox to "not a browser". The tracking-parameter
+  stripper skipped any URL whose query was *entirely* tracking — exactly the
+  links most worth cleaning. Both are fixed; the commit messages explain why.
+- The parts a compositor cannot be scripted into doing — window focus after a
+  launch, the held-modifier gesture, clicking through the picker — were tested
+  by hand, by me.
+
+The commit messages are unusually detailed by intent. They record why each
+non-obvious decision was made, since that reasoning is the part hardest to
+recover later.

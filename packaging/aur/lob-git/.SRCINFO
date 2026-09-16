@@ -1,0 +1,36 @@
+pkgbase = lob-git
+	pkgdesc = Choose which browser opens each link (development version)
+	pkgver = 0.1.r0.g0000000
+	pkgrel = 1
+	url = https://github.com/puco/lob
+	arch = x86_64
+	license = MIT
+	makedepends = cmake
+	makedepends = ninja
+	makedepends = extra-cmake-modules
+	makedepends = git
+	depends = qt6-base
+	depends = qt6-declarative
+	depends = qt6-svg
+	depends = kirigami
+	depends = kirigami-addons
+	depends = ki18n
+	depends = kcoreaddons
+	depends = kconfig
+	depends = kdbusaddons
+	depends = knotifications
+	depends = kwindowsystem
+	depends = kiconthemes
+	depends = kcolorscheme
+	depends = kcrash
+	depends = kstatusnotifieritem
+	depends = kservice
+	depends = kio
+	depends = layer-shell-qt
+	depends = qqc2-desktop-style
+	provides = lob=0.1
+	conflicts = lob
+	source = lob::git+https://github.com/puco/lob.git
+	sha256sums = SKIP
+
+pkgname = lob-git

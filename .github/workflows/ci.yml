@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    # Arch rather than Ubuntu: Lob needs KDE Frameworks 6.30+ and
+    # layer-shell-qt, which Ubuntu's archives lag well behind.
+    container: archlinux:latest
+
+    steps:
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm --needed \
+            base-devel git cmake ninja extra-cmake-modules \
+            qt6-base qt6-declarative qt6-svg \
+            kirigami kirigami-addons ki18n kcoreaddons kconfig kdbusaddons \
+            knotifications kwindowsystem kiconthemes kcolorscheme kcrash \
+            kstatusnotifieritem kservice kio layer-shell-qt qqc2-desktop-style \
+            appstream
+
+      - uses: actions/checkout@v4
+
+      - name: Check version consistency
+        run: ./packaging/check-version.sh
+
+      - name: Configure
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DBUILD_TESTING=ON
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        # The tests are headless by design; the GUI needs a compositor, which
+        # CI has none of, so anything requiring one is verified by hand.
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Install
+        run: DESTDIR="$PWD/staging" cmake --install build
+
+      - name: Validate desktop entry and AppStream metadata
+        run: |
+          desktop-file-validate staging/usr/share/applications/io.github.puco.lob.desktop
+          appstreamcli validate --no-net staging/usr/share/metainfo/io.github.puco.lob.metainfo.xml
+
+  packaging:
+    name: Validate PKGBUILDs
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+
+    steps:
+      - name: Install dependencies
+        run: pacman -Syu --noconfirm --needed base-devel git pacman-contrib
+
+      - uses: actions/checkout@v4
+
+      - name: Check .SRCINFO is current
+        # A stale .SRCINFO is the usual way an AUR package breaks: the AUR reads
+        # it, not the PKGBUILD, so the two disagreeing ships the wrong metadata.
+        run: |
+          useradd -m builder && chown -R builder .
+          for pkg in lob lob-git; do
+            su builder -c "cd packaging/aur/$pkg && makepkg --printsrcinfo > /tmp/$pkg.SRCINFO"
+            diff -u "packaging/aur/$pkg/.SRCINFO" "/tmp/$pkg.SRCINFO" \
+              || { echo "::error::packaging/aur/$pkg/.SRCINFO is stale; regenerate with 'makepkg --printsrcinfo > .SRCINFO'"; exit 1; }
+          done
