@@ -43,6 +43,11 @@ public:
 
     /// True while a picker is on screen.
     bool isBusy() const;
+    bool acceptedAnyUrl() const { return m_acceptedAnyUrl; }
+
+    /// True while this process is the clipboard's owner and has to stay alive
+    /// to serve what it copied.
+    bool servingClipboard() const { return m_servingClipboard; }
 
 private:
     struct PendingUrl {
@@ -54,6 +59,8 @@ private:
     void enqueue(const QUrl &rawUrl, const QString &token, bool forcePicker);
     void processQueue();
     void onPickerFinished();
+    void releaseClipboard();
+    void quitWhenIdle();
 
     QQmlApplicationEngine *m_engine = nullptr;
     RuleStore *m_store = nullptr;
@@ -65,6 +72,8 @@ private:
     QQueue<PendingUrl> m_queue;
     bool m_busy = false;
     bool m_daemon = false;
+    bool m_acceptedAnyUrl = false;
+    bool m_servingClipboard = false;
 };
 
 } // namespace Lob

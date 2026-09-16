@@ -12,6 +12,7 @@
 #include <QQuickStyle>
 #include <QTextStream>
 #include <QUrl>
+#include <QTimer>
 
 #include <KAboutData>
 #include <KCrash>
@@ -57,10 +58,18 @@ int runList()
         return 0;
     }
 
+    // Everything discovered is routable by id; the picker leaves out rows that
+    // would say the same thing twice, and saying so here keeps the two views
+    // from looking like a disagreement.
+    const auto listed = Lob::TargetRegistry::withoutRedundantProfiles(targets);
+
     for (const Lob::Target &target : targets) {
         const bool browser = target.kind == Lob::TargetKind::Browser;
         out << (browser ? "[browser] " : "[other]   ") << target.label << '\n';
         out << "    id:      " << target.id << '\n';
+        if (!listed.contains(target)) {
+            out << "    listed:  no -- the browser's only profile, reachable as " << target.storageId << '\n';
+        }
         out << "    exec:    " << target.execPath << '\n';
         out << "    engine:  " << familyName(target.family) << '\n';
         if (!target.profileKey.isEmpty()) {
@@ -68,14 +77,15 @@ int runList()
                 << "  (" << target.profileKey << ")\n";
         }
 
-        // The exact command line, so the launch path is inspectable without
-        // actually opening a browser.
+        // KIO owns unmodified desktop launches; modified launches have argv.
         const QUrl sample(QStringLiteral("https://example.com/path?a=1"));
-        out << "    open:    " << Lob::Launcher::buildArgv(target, sample, false).join(QLatin1Char(' ')) << '\n';
+        out << "    open:    " << (target.profileKey.isEmpty()
+            ? QStringLiteral("KIO desktop launch: ") + target.storageId
+            : Lob::Launcher::buildArgv(target, sample, false).join(QLatin1Char(' '))) << '\n';
         if (target.supportsPrivate()) {
             out << "    private: " << Lob::Launcher::buildArgv(target, sample, true).join(QLatin1Char(' ')) << '\n';
         }
-        if (!Lob::Launcher::execIsSafe(target.execPath)) {
+        if (!Lob::Launcher::commandIsSafe(target.command)) {
             out << "    BLOCKED: exec is a shell or interpreter\n";
         }
         out << '\n';
@@ -302,12 +312,12 @@ int main(int argc, char *argv[])
         controller.handleUrls(urls, takeActivationToken());
     });
 
-    controller.handleArgs(rawArgs, inboundToken);
-
-    // A one-shot invocation with nothing routable left has no reason to linger.
-    if (!daemonMode && !controller.isBusy()) {
-        return 2;
-    }
+    QTimer::singleShot(0, &controller, [&controller, rawArgs, inboundToken, daemonMode] {
+        controller.handleArgs(rawArgs, inboundToken);
+        if (!daemonMode && !controller.isBusy() && !controller.servingClipboard()) {
+            QCoreApplication::exit(controller.acceptedAnyUrl() ? 0 : 2);
+        }
+    });
 
     return app.exec();
 }

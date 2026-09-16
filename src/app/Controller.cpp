@@ -4,6 +4,7 @@
 #include "core/RuleEngine.h"
 #include "core/RuleStore.h"
 #include "core/UrlSanitizer.h"
+#include "core/DefaultBrowserManager.h"
 #include "ui/PickerController.h"
 
 #include <KLocalizedQmlContext>
@@ -20,6 +21,13 @@ Q_LOGGING_CATEGORY(LOG_CONTROLLER, "lob.controller")
 
 namespace Lob
 {
+
+namespace
+{
+/// How long a one-shot run keeps serving a URL it copied to the clipboard,
+/// when no clipboard manager takes it over.
+constexpr int kClipboardHoldMs = 5 * 60 * 1000;
+} // namespace
 
 Controller::Controller(QObject *parent)
     : QObject(parent)
@@ -48,6 +56,7 @@ bool Controller::initialize()
 
     m_store = new RuleStore(this);
     m_picker = new PickerController(m_store, this);
+    connect(m_store, &RuleStore::errorOccurred, m_picker, &PickerController::errorOccurred);
     m_picker->refreshTargets();
 
     // An edit to rules.json outside the app takes effect without a restart.
@@ -61,10 +70,28 @@ bool Controller::initialize()
     }
 
     connect(m_picker, &PickerController::finished, this, &Controller::onPickerFinished);
+    connect(m_picker, &PickerController::clipboardCopied, this, [this] {
+        m_servingClipboard = QGuiApplication::clipboard()->ownsClipboard();
+        if (m_servingClipboard && !m_daemon) {
+            // Nothing is obliged to take the selection from us, and on Wayland
+            // it dies with this process. Outliving the copy by a few minutes
+            // covers a paste; outliving the session does not, so a one-shot run
+            // gives it up rather than becoming a process nobody knows about.
+            QTimer::singleShot(kClipboardHoldMs, this, [this] { releaseClipboard(); });
+        }
+    });
+    connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, this, [this] {
+        if (m_servingClipboard && !QGuiApplication::clipboard()->ownsClipboard()) {
+            releaseClipboard();
+        }
+    });
     connect(m_picker, &PickerController::errorOccurred, this, [](const QString &message) {
         qCWarning(LOG_CONTROLLER) << message;
         KNotification::event(KNotification::Error, i18n("Lob"), message, QStringLiteral("internet-web-browser"));
     });
+    if (!m_store->lastError().isEmpty()) {
+        QTimer::singleShot(0, m_picker, [this] { Q_EMIT m_picker->errorOccurred(m_store->lastError()); });
+    }
 
     if (m_daemon) {
         m_tray = new TrayController(this);
@@ -87,6 +114,7 @@ bool Controller::initialize()
 void Controller::handleArgs(const QStringList &args, const QString &activationToken)
 {
     const bool forcePicker = args.contains(QStringLiteral("--pick"));
+    QString token = activationToken;
 
     for (int i = 1; i < args.size(); ++i) {
         const QString &arg = args.at(i);
@@ -97,43 +125,38 @@ void Controller::handleArgs(const QStringList &args, const QString &activationTo
         const QUrl url = QUrl::fromUserInput(arg);
         QString reason;
         if (!UrlSanitizer::isRoutable(url, &reason)) {
-            qCWarning(LOG_CONTROLLER) << "refusing" << arg << ":" << reason;
+            qCWarning(LOG_CONTROLLER) << "refusing URL:" << reason;
             continue;
         }
-        enqueue(url, activationToken, forcePicker);
+        enqueue(url, token, forcePicker);
+        token.clear(); // activation tokens are single-use, including multi-URL requests
     }
 }
 
 void Controller::handleUrls(const QList<QUrl> &urls, const QString &activationToken)
 {
+    QString token = activationToken;
     for (const QUrl &url : urls) {
         QString reason;
         if (!UrlSanitizer::isRoutable(url, &reason)) {
-            qCWarning(LOG_CONTROLLER) << "refusing" << url.toString() << ":" << reason;
+            qCWarning(LOG_CONTROLLER) << "refusing URL:" << reason;
             continue;
         }
-        enqueue(url, activationToken, false);
+        enqueue(url, token, false);
+        token.clear();
     }
 }
 
 void Controller::enqueue(const QUrl &rawUrl, const QString &token, bool forcePicker)
 {
+    m_acceptedAnyUrl = true;
     // Strip before the rules see it, so a rule matching on query parameters
     // matches what will actually be opened rather than what arrived.
     const QUrl url = m_store->stripTracking()
         ? UrlSanitizer::strip(rawUrl, m_store->trackingParameters())
         : rawUrl;
     if (url != rawUrl) {
-        qCDebug(LOG_CONTROLLER) << "stripped tracking parameters:" << rawUrl.toString() << "->" << url.toString();
-    }
-
-    // While paused, links still open -- they just skip the question. Queueing
-    // them up to ask later would be worse than picking a sensible browser now.
-    if (m_tray && m_tray->isPaused() && !forcePicker) {
-        if (!m_picker->launchFallback(url, token, m_store->fallbackTargetId())) {
-            qCWarning(LOG_CONTROLLER) << "paused, but no browser to fall back to";
-        }
-        return;
+        qCDebug(LOG_CONTROLLER) << "stripped tracking parameters for host" << url.host();
     }
 
     m_queue.enqueue({url, token, forcePicker});
@@ -148,6 +171,19 @@ void Controller::processQueue()
 
     const PendingUrl pending = m_queue.dequeue();
     m_busy = true;
+
+    // While paused, links still open -- they just skip the question. Queueing
+    // them up to ask later would be worse than picking a sensible browser now:
+    // the configured fallback, else whatever handled links before we did. Only
+    // if neither exists is asking better than dropping the link.
+    if (m_tray && m_tray->isPaused() && !pending.forcePicker) {
+        if (m_picker->launchFallback(pending.url, pending.token, m_store->fallbackTargetId())
+            || m_picker->launchFallback(pending.url, pending.token, DefaultBrowserManager::previousHandler(pending.url.scheme()))) {
+            return;
+        }
+        m_picker->showPicker(pending.url, pending.token);
+        return;
+    }
 
     if (pending.forcePicker) {
         m_picker->showPicker(pending.url, pending.token);
@@ -173,9 +209,31 @@ void Controller::onPickerFinished()
         return;
     }
 
-    if (!m_daemon) {
-        QGuiApplication::quit();
+    if (!m_daemon && !m_servingClipboard) {
+        quitWhenIdle();
     }
+}
+
+void Controller::releaseClipboard()
+{
+    if (!m_servingClipboard) {
+        return;
+    }
+    m_servingClipboard = false;
+    if (!m_daemon) {
+        quitWhenIdle();
+    }
+}
+
+void Controller::quitWhenIdle()
+{
+    // Deferred: a link may still be queued behind the one that just finished,
+    // and exiting from inside its own completion would strand it.
+    QTimer::singleShot(0, this, [this] {
+        if (!m_busy && m_queue.isEmpty() && !m_servingClipboard) {
+            QCoreApplication::exit(0);
+        }
+    });
 }
 
 } // namespace Lob

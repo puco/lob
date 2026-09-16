@@ -84,6 +84,24 @@ instead of opening · `Esc` cancel · arrows and `Enter` also work.
 
 Holding **Shift** while clicking a link forces the picker even when a rule
 would have matched. During the hold bar, any key or click does the same.
+This gesture requires a nonzero hold duration; `--pick` also works with a zero hold.
+
+Private mode never silently falls back to a normal window. Unsupported targets
+are disabled, and a launch failure leaves the link in the picker for retry.
+Escape can cancel while an activation token is pending; once the launch has
+been dispatched, Lob waits for its result.
+After copying, a one-shot process stays alive while it owns the clipboard so
+the selection remains available. On Wayland, even a zero-hold copy briefly
+presents a surface to obtain the focus required to own the selection.
+
+Browser/profile changes are discovered automatically. **Refresh browsers**
+rescans immediately. Explicit profile IDs remain stable when other profiles are
+added or removed; a plain desktop ID selects the browser's own default. Old
+remembered desktop IDs are upgraded only when a single profile makes the
+intended choice unambiguous; otherwise Lob asks again.
+
+**Pause Routing** uses the configured browser fallback, then the previous
+browser for the URL's scheme. If neither is available, it shows the picker.
 
 This works because a Wayland client can see which keys were already held when
 it takes keyboard focus, which is the only moment the gesture is observable --
