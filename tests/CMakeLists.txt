@@ -7,6 +7,11 @@ foreach(test RuleEngineTest RuleStoreTest BrowserProfilesTest LauncherTest Defau
     ecm_mark_as_test(${test})
 endforeach()
 
+add_executable(PickerControllerTest PickerControllerTest.cpp)
+target_link_libraries(PickerControllerTest PRIVATE lobui Qt6::Test)
+add_test(NAME PickerControllerTest COMMAND PickerControllerTest)
+ecm_mark_as_test(PickerControllerTest)
+
 add_executable(LaunchRecorder LaunchRecorder.cpp)
 target_link_libraries(LaunchRecorder PRIVATE Qt6::Core)
 add_executable(LauncherIntegrationTest LauncherIntegrationTest.cpp)

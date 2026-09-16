@@ -8,7 +8,6 @@ Window {
 
     property bool privateMode: false
     property bool rememberChoice: false
-    property int current: 0
 
     // Drains 1 -> 0 across the hold. Drives the bar directly rather than
     // animating a control's value, so what is on screen is the time actually
@@ -33,7 +32,7 @@ Window {
     // Reset per invocation: a stale selection, a lingering private toggle or a
     // leftover "remember" tick from the previous link would all be surprises.
     onVisibleChanged: if (visible) {
-        root.current = 0
+        picker.currentIndex = 0
         root.privateMode = false
         root.rememberChoice = false
         keyHandler.forceActiveFocus()
@@ -46,19 +45,11 @@ Window {
         function onContextChanged() {
             if (picker.holding) {
                 root.holdProgress = 1
-                holdTimer.restart()
                 holdAnimation.restart()
             } else {
-                holdTimer.stop()
                 holdAnimation.stop()
             }
         }
-    }
-
-    Timer {
-        id: holdTimer
-        interval: picker.holdMs
-        onTriggered: picker.holdCompleted()
     }
 
     NumberAnimation {
@@ -91,6 +82,11 @@ Window {
         focus: true
 
         Keys.onPressed: (event) => {
+            if (picker.launching) {
+                if (event.key === Qt.Key_Escape) picker.cancel()
+                event.accepted = true
+                return
+            }
             // While holding, every key is an escape hatch: the point is that
             // the decision is easy to catch, not that you must catch it exactly.
             if (picker.holding) {
@@ -104,14 +100,14 @@ Window {
                 picker.cancel(); event.accepted = true; return
             case Qt.Key_Return:
             case Qt.Key_Enter:
-                root.choose(root.current); event.accepted = true; return
+                root.choose(picker.currentIndex); event.accepted = true; return
             case Qt.Key_Right:
             case Qt.Key_Down:
-                root.current = Math.min(root.current + 1, picker.targets.rowCount() - 1)
+                picker.currentIndex = Math.min(picker.currentIndex + 1, picker.targets.rowCount() - 1)
                 event.accepted = true; return
             case Qt.Key_Left:
             case Qt.Key_Up:
-                root.current = Math.max(root.current - 1, 0)
+                picker.currentIndex = Math.max(picker.currentIndex - 1, 0)
                 event.accepted = true; return
             case Qt.Key_P:
                 root.privateMode = !root.privateMode; event.accepted = true; return
@@ -147,11 +143,26 @@ Window {
                 Layout.topMargin: -Kirigami.Units.smallSpacing
                 horizontalAlignment: Text.AlignHCenter
                 text: picker.url
+                textFormat: Text.PlainText
                 opacity: 0.7
                 elide: Text.ElideMiddle
             }
 
             // ---- Hold: a decision already made, shown so it can be caught ----
+            QQC2.Label {
+                Layout.fillWidth: true
+                visible: picker.errorMessage !== ""
+                text: picker.errorMessage
+                textFormat: Text.PlainText
+                wrapMode: Text.Wrap
+            }
+
+            QQC2.Label {
+                Layout.alignment: Qt.AlignHCenter
+                visible: picker.launching
+                text: i18n("Opening browser…")
+            }
+
             Kirigami.Card {
                 Layout.fillWidth: true
                 visible: picker.holding
@@ -201,6 +212,13 @@ Window {
             }
 
             // ---- Picker ----
+            QQC2.Label {
+                Layout.fillWidth: true
+                visible: !picker.holding && picker.targets.count === 0
+                text: i18n("No browsers found. Install a browser, then refresh the list.")
+                wrapMode: Text.Wrap
+                horizontalAlignment: Text.AlignHCenter
+            }
             //
             // Centred and sized to its contents rather than stretched: a Flow
             // filling the full width packs fixed-width cells from the left and
@@ -216,6 +234,7 @@ Window {
                 Layout.fillWidth: false
                 Layout.alignment: Qt.AlignHCenter
                 visible: !picker.holding
+                enabled: !picker.launching
 
                 contentItem: GridLayout {
                     id: grid
@@ -247,10 +266,14 @@ Window {
                             required property string iconName
                             required property string shortcut
                             required property bool isBrowser
+                            required property bool supportsPrivate
 
                             Layout.preferredWidth: grid.cellWidth
                             Layout.preferredHeight: grid.cellHeight
-                            highlighted: root.current === index
+                            highlighted: picker.currentIndex === index
+                            enabled: !root.privateMode || supportsPrivate
+                            QQC2.ToolTip.text: i18n("Private browsing is unavailable for this target")
+                            QQC2.ToolTip.visible: hovered && root.privateMode && !supportsPrivate
                             opacity: isBrowser ? 1.0 : 0.65
 
                             onClicked: root.choose(index)
@@ -269,6 +292,7 @@ Window {
                                     Layout.fillWidth: true
                                     horizontalAlignment: Text.AlignHCenter
                                     text: label
+                                    textFormat: Text.PlainText
                                     wrapMode: Text.Wrap
                                     maximumLineCount: 2
                                     elide: Text.ElideRight
@@ -292,6 +316,7 @@ Window {
                 Layout.alignment: Qt.AlignHCenter
                 visible: !picker.holding
                 spacing: Kirigami.Units.largeSpacing
+                enabled: !picker.launching
 
                 QQC2.CheckBox {
                     checked: root.rememberChoice
@@ -305,6 +330,11 @@ Window {
                     visible: root.privateMode
                     text: i18n("Private window")
                     font.bold: true
+                }
+
+                QQC2.Button {
+                    text: i18n("Refresh browsers")
+                    onClicked: picker.refreshTargets()
                 }
             }
 

@@ -130,7 +130,7 @@ void Controller::enqueue(const QUrl &rawUrl, const QString &token, bool forcePic
     // While paused, links still open -- they just skip the question. Queueing
     // them up to ask later would be worse than picking a sensible browser now.
     if (m_tray && m_tray->isPaused() && !forcePicker) {
-        if (!m_picker->launchFallback(url)) {
+        if (!m_picker->launchFallback(url, token, m_store->fallbackTargetId())) {
             qCWarning(LOG_CONTROLLER) << "paused, but no browser to fall back to";
         }
         return;

@@ -61,20 +61,21 @@ target_link_libraries(lobcore PUBLIC
     KF6::Service KF6::KIOGui KF6::WindowSystem
 )
 
+add_library(lobui STATIC src/ui/PickerController.cpp src/ui/TargetModel.cpp)
+target_link_libraries(lobui PUBLIC lobcore Qt6::Qml Qt6::Quick LayerShellQt::Interface)
+
 add_executable(lob)
 
 target_sources(lob PRIVATE
     src/main.cpp
     src/app/Controller.cpp
     src/app/TrayController.cpp
-    src/ui/PickerController.cpp
-    src/ui/TargetModel.cpp
 )
 
 target_include_directories(lob PRIVATE src)
 
 target_link_libraries(lob PRIVATE
-    lobcore
+    lobui
     Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Widgets
     Qt6::Network Qt6::DBus
     KF6::CoreAddons KF6::I18n KF6::I18nQml KF6::ConfigCore KF6::ConfigGui

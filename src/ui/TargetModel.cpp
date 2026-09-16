@@ -58,7 +58,7 @@ QVariant TargetModel::data(const QModelIndex &index, int role) const
     case SupportsPrivateRole:
         return target.supportsPrivate();
     case ShortcutRole:
-        // Only the first nine get a digit; beyond that the filter is the way in.
+        // Only the first nine get a digit; later targets use arrows or a click.
         return index.row() < 9 ? QString::number(index.row() + 1) : QString();
     default:
         return {};

@@ -9,6 +9,7 @@
 
 #include <KLocalizedString>
 #include <KWindowSystem>
+#include <KSycoca>
 
 #include <QClipboard>
 #include <QGuiApplication>
@@ -19,6 +20,9 @@
 #include <QScreen>
 #include <QTimer>
 #include <QWindow>
+#include <QPointer>
+#include <QFileInfo>
+#include <QStandardPaths>
 
 Q_LOGGING_CATEGORY(LOG_PICKER, "lob.picker")
 
@@ -27,21 +31,64 @@ namespace Lob
 
 namespace
 {
-/// With KeyboardInteractivityExclusive a picker that fails to hide is a
-/// session-level keyboard trap, so it always gets force-hidden eventually.
-constexpr int kWatchdogMs = 60'000;
-
 /// Holding this while clicking a link overrides whatever rule would fire.
 constexpr Qt::KeyboardModifier kOverrideModifier = Qt::ShiftModifier;
+
+/// Desktop files and profile stores change in bursts (an install, a browser
+/// rewriting its profile list), so a change is a reason to look again shortly,
+/// not immediately.
+constexpr int kRefreshDebounceMs = 100;
+
+/// While a link is being acted on, the list underneath must not move. The
+/// refresh waits, rather than being dropped.
+constexpr int kRefreshWhileBusyMs = 500;
 } // namespace
 
-PickerController::PickerController(RuleStore *store, QObject *parent)
+PickerController::PickerController(RuleStore *store, QObject *parent, Launcher *launcher, int watchdogMs)
     : QObject(parent)
     , m_store(store)
     , m_model(new TargetModel(this))
-    , m_launcher(new Launcher(this))
+    , m_launcher(launcher ? launcher : new Launcher(this))
 {
-    connect(m_launcher, &Launcher::launchFailed, this, &PickerController::errorOccurred);
+    m_holdTimer.setSingleShot(true);
+    m_watchdog.setSingleShot(true);
+    m_watchdog.setInterval(watchdogMs);
+    connect(&m_holdTimer, &QTimer::timeout, this, &PickerController::holdCompleted);
+    connect(&m_watchdog, &QTimer::timeout, this, &PickerController::watchdogExpired);
+
+    m_refreshTimer.setSingleShot(true);
+    m_refreshTimer.setInterval(kRefreshDebounceMs);
+    connect(&m_refreshTimer, &QTimer::timeout, this, &PickerController::refreshTargets);
+    const auto scheduleRefresh = [this] { m_refreshTimer.start(kRefreshDebounceMs); };
+    connect(&m_targetWatcher, &QFileSystemWatcher::fileChanged, this, scheduleRefresh);
+    connect(&m_targetWatcher, &QFileSystemWatcher::directoryChanged, this, scheduleRefresh);
+    connect(KSycoca::self(), &KSycoca::databaseChanged, this, scheduleRefresh);
+}
+
+void PickerController::watchdogExpired()
+{
+    // With KeyboardInteractivityExclusive a picker that fails to hide is a
+    // session-level keyboard trap, so it always gets taken down eventually.
+    if (m_mode == Mode::Launching && m_operation && m_operation->dispatched && !m_launchStalled) {
+        // The launch is already out of our hands: drop the input grab but keep
+        // waiting for its result, which is still the honest answer to report.
+        m_launchStalled = true;
+        hidePicker();
+        m_watchdog.start();
+        return;
+    }
+
+    if (m_mode == Mode::Launching) {
+        // Twice over and still nothing back. Give up on this link rather than
+        // leave every later one queued behind it forever.
+        qCWarning(LOG_PICKER) << "launch never reported back; abandoning it";
+        m_error = i18n("The browser did not report back. The link may or may not have opened.");
+        Q_EMIT errorOccurred(m_error);
+        finish();
+        return;
+    }
+
+    cancel();
 }
 
 QAbstractItemModel *PickerController::targetsModel() const
@@ -113,19 +160,25 @@ bool PickerController::hasTargets() const
     return m_model->rowCount() > 0;
 }
 
-Target PickerController::targetById(const QString &id) const
+Target PickerController::targetById(const QString &id, bool remembered) const
 {
-    const auto &targets = m_model->targets();
-    for (const Target &target : targets) {
-        if (target.id == id) {
-            return target;
-        }
-    }
-    return {};
+    return TargetRegistry::resolve(m_targets, id, remembered);
+}
+
+void PickerController::setCurrentIndex(int index)
+{
+    if (m_currentIndex == index) { return; }
+    m_currentIndex = index;
+    Q_EMIT selectionChanged();
 }
 
 void PickerController::refreshTargets()
 {
+    if (m_mode == Mode::Launching || m_mode == Mode::Hold) {
+        m_refreshTimer.start(kRefreshWhileBusyMs);
+        return;
+    }
+
     auto targets = TargetRegistry::discover(QStringLiteral(LOB_APP_ID ".desktop"));
 
     // Handlers that are not browsers stay hidden until explicitly enabled, but
@@ -138,7 +191,70 @@ void PickerController::refreshTargets()
         });
     }
 
-    m_model->setTargets(targets);
+    watchTargetSources(targets);
+    setTargets(targets);
+}
+
+void PickerController::setTargets(const QList<Target> &targets)
+{
+    // Rules and memories resolve against everything discovered; the list only
+    // shows what is worth reading.
+    m_targets = targets;
+
+    const QList<Target> listed = TargetRegistry::withoutRedundantProfiles(targets);
+    if (listed == m_model->targets()) {
+        return;
+    }
+
+    // Keep the highlight on whatever it was on. A target that disappeared
+    // takes the highlight back to the top rather than leaving none at all.
+    const QString selected = m_model->at(m_currentIndex).id;
+    m_model->setTargets(listed);
+
+    int index = 0;
+    for (int n = 0; n < listed.size(); ++n) {
+        if (listed.at(n).id == selected) {
+            index = n;
+            break;
+        }
+    }
+    setCurrentIndex(listed.isEmpty() ? -1 : index);
+}
+
+void PickerController::watchTargetSources(const QList<Target> &targets)
+{
+    // Watching the profile stores themselves is what makes a new browser
+    // profile show up without a restart. Nothing is polled: a store that did
+    // not exist when this ran is not watched, and "Refresh browsers" is the
+    // way in for that case.
+    QStringList paths;
+    const QString config = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
+    if (QFileInfo::exists(config)) {
+        paths << config;
+    }
+    for (const auto &target : targets) {
+        if (target.dataDir.isEmpty()) {
+            continue;
+        }
+        for (const auto &path : QStringList{target.dataDir, target.dataDir + QStringLiteral("/Local State"),
+                                           target.dataDir + QStringLiteral("/profiles.ini")}) {
+            if (QFileInfo::exists(path) && !paths.contains(path)) {
+                paths << path;
+            }
+        }
+    }
+
+    const QStringList watched = m_targetWatcher.files() + m_targetWatcher.directories();
+    for (const auto &path : watched) {
+        if (!paths.contains(path)) {
+            m_targetWatcher.removePath(path);
+        }
+    }
+    for (const auto &path : std::as_const(paths)) {
+        if (!watched.contains(path)) {
+            m_targetWatcher.addPath(path);
+        }
+    }
 }
 
 bool PickerController::ensureWindow(QQmlApplicationEngine *engine)
@@ -174,6 +290,7 @@ bool PickerController::ensureWindow(QQmlApplicationEngine *engine)
         layer->setExclusiveZone(-1);
         layer->setScope(QStringLiteral("lob-picker"));
         layer->setCloseOnDismissed(false);
+        layer->setWantsToBeOnActiveScreen(true);
     } else {
         m_window->setFlags(m_window->flags() | Qt::Dialog | Qt::WindowStaysOnTopHint);
     }
@@ -181,6 +298,9 @@ bool PickerController::ensureWindow(QQmlApplicationEngine *engine)
     connect(m_window, &QWindow::activeChanged, this, [this] {
         if (m_window->isActive()) {
             checkHeldModifiers();
+            if (m_mode == Mode::Hold && m_decision.action == RuleAction::Copy && holdMs() == 0) {
+                runDecision();
+            }
         }
     });
 
@@ -189,7 +309,7 @@ bool PickerController::ensureWindow(QQmlApplicationEngine *engine)
 
 void PickerController::showPicker(const QUrl &url, const QString &activationToken)
 {
-    m_url = url;
+    begin(url, activationToken);
     m_mode = Mode::Picker;
     m_decision = {};
     present(activationToken);
@@ -197,7 +317,7 @@ void PickerController::showPicker(const QUrl &url, const QString &activationToke
 
 void PickerController::showHold(const QUrl &url, const QString &activationToken, const Decision &decision)
 {
-    m_url = url;
+    begin(url, activationToken);
     m_decision = decision;
 
     // A zero hold is a deliberate "stop asking me": carry it out at once rather
@@ -206,6 +326,13 @@ void PickerController::showHold(const QUrl &url, const QString &activationToken,
     // doing both would advance the queue twice for one URL.
     if (holdMs() <= 0) {
         m_mode = Mode::Hold;
+        // Wayland selection ownership requires keyboard focus, even for an
+        // automatic copy. Show the surface before setting the clipboard.
+        if (decision.action == RuleAction::Copy && m_window && KWindowSystem::isPlatformWayland()) {
+            present(activationToken);
+            if (m_mode == Mode::Hold && m_window->isActive()) { runDecision(); }
+            return;
+        }
         runDecision();
         // Unless the rule pointed at a target that no longer exists, in which
         // case runDecision() falls back to asking and the picker has to appear
@@ -218,12 +345,31 @@ void PickerController::showHold(const QUrl &url, const QString &activationToken,
 
     m_mode = Mode::Hold;
     present(activationToken);
+    if (m_mode == Mode::Hold) {
+        m_holdTimer.start(holdMs());
+    }
+}
+
+void PickerController::begin(const QUrl &url, const QString &activationToken)
+{
+    ++m_requestId;
+    m_holdTimer.stop();
+    m_watchdog.stop();
+    if (m_operation) {
+        m_operation->cancel();
+    }
+    m_operation.clear();
+    m_error.clear();
+    setCurrentIndex(0);
+    m_url = url;
+    m_activationToken = activationToken;
 }
 
 void PickerController::present(const QString &activationToken)
 {
     m_showTimer.start();
     Q_EMIT contextChanged();
+    m_watchdog.start();
 
     if (!m_window) {
         return;
@@ -253,14 +399,7 @@ void PickerController::present(const QString &activationToken)
         KWindowSystem::setCurrentXdgActivationToken(activationToken);
     }
     KWindowSystem::activateWindow(m_window);
-
-    QTimer::singleShot(kWatchdogMs, this, [this] {
-        if (m_window && m_window->isVisible()) {
-            qCWarning(LOG_PICKER) << "watchdog fired; force-hiding";
-            hidePicker();
-            Q_EMIT finished();
-        }
-    });
+    m_activationToken.clear();
 }
 
 void PickerController::checkHeldModifiers()
@@ -288,6 +427,7 @@ void PickerController::interruptHold()
         return;
     }
     m_mode = Mode::Picker;
+    m_holdTimer.stop();
     Q_EMIT contextChanged();
 }
 
@@ -305,76 +445,115 @@ void PickerController::holdCompleted()
 void PickerController::runDecision()
 {
     if (m_decision.action == RuleAction::Copy) {
-        // On Wayland the copying client owns the selection and has to stay
-        // alive to serve it. That holds for the daemon, but a one-shot run
-        // would drop the content the moment it exits unless a clipboard
-        // manager (Plasma runs one) has taken a copy first.
+        // Controller keeps even a one-shot process alive while it owns the
+        // selection, so the clipboard can still serve the URL after dismissal.
         QGuiApplication::clipboard()->setText(m_url.toString());
-        qCDebug(LOG_PICKER) << "copied to clipboard; read back:" << QGuiApplication::clipboard()->text();
-        hidePicker();
-        Q_EMIT finished();
+        Q_EMIT clipboardCopied();
+        qCDebug(LOG_PICKER) << "copied URL to clipboard";
+        finish();
         return;
     }
 
-    const Target target = targetById(m_decision.targetId);
+    const Target target = targetById(m_decision.targetId, decisionPredatesProfileIds());
     if (target.id.isEmpty()) {
         // The rule names a target that is no longer installed. Asking is the
         // only honest response; silently picking something else would be worse.
         qCWarning(LOG_PICKER) << "decision names unknown target" << m_decision.targetId << "- asking instead";
         m_mode = Mode::Picker;
+        m_error = i18n("The configured browser or profile is unavailable or ambiguous. Choose a browser for this link.");
         Q_EMIT contextChanged();
         return;
     }
 
-    m_launcher->launch(target, m_url, m_decision.privateWindow, m_window, [this](LaunchResult) {
-        hidePicker();
-        Q_EMIT finished();
-    });
+    // Rewriting the memory once a legacy one has resolved records the profile
+    // it meant, so the same link cannot become ambiguous again later.
+    startLaunch(target, m_decision.privateWindow, decisionPredatesProfileIds());
 }
 
-bool PickerController::launchFallback(const QUrl &url)
+bool PickerController::decisionPredatesProfileIds() const
 {
-    const auto &targets = m_model->targets();
-    for (const Target &target : targets) {
-        if (target.kind == TargetKind::Browser) {
-            m_launcher->launch(target, url, false, m_window);
-            return true;
-        }
-    }
-    return false;
+    return m_decision.source == Decision::Source::Memory && m_decision.legacyTarget;
+}
+
+bool PickerController::launchFallback(const QUrl &url, const QString &activationToken, const QString &targetId)
+{
+    const Target target = targetById(targetId);
+    if (target.id.isEmpty() || target.kind != TargetKind::Browser) { return false; }
+    begin(url, activationToken);
+    startLaunch(target, false, false);
+    return true;
 }
 
 void PickerController::choose(int index, bool privateWindow, bool remember)
 {
+    if (m_mode != Mode::Picker) {
+        return;
+    }
     const Target target = m_model->at(index);
     if (target.id.isEmpty()) {
         return;
     }
 
-    if (remember && m_store) {
-        m_store->remember(m_url.host(), target.id, privateWindow);
-    }
+    startLaunch(target, privateWindow, remember);
+}
 
-    // The window stays mapped until the launch has gone through: the
-    // activation token is minted from it asynchronously, and hiding it first
-    // loses the token and with it the browser's claim to the foreground.
-    m_launcher->launch(target, m_url, privateWindow, m_window, [this](LaunchResult) {
-        hidePicker();
-        Q_EMIT finished();
-    });
+void PickerController::startLaunch(const Target &target, bool privateWindow, bool remember)
+{
+    m_holdTimer.stop();
+    m_launchStalled = false;
+    m_watchdog.start();
+    m_mode = Mode::Launching;
+    Q_EMIT contextChanged();
+    const auto id = ++m_requestId;
+    const QString host = m_url.host();
+    m_operation = QSharedPointer<LaunchOperation>::create();
+    QPointer<PickerController> guard(this);
+    m_launcher->launch(target, m_url, privateWindow, m_window,
+        [guard, id, target, host, privateWindow, remember](LaunchResult result) {
+            if (!guard || guard->m_requestId != id || guard->m_mode != Mode::Launching) {
+                return;
+            }
+            if (result.outcome == LaunchResult::Failed) {
+                guard->m_error = result.error;
+                guard->m_mode = Mode::Picker;
+                guard->present(guard->m_activationToken);
+                Q_EMIT guard->errorOccurred(result.error);
+                return;
+            }
+            if (result.outcome == LaunchResult::Started && remember && guard->m_store) {
+                guard->m_store->remember(host, target.id, privateWindow);
+            }
+            guard->finish();
+        }, m_activationToken, m_operation);
+}
+
+void PickerController::finish()
+{
+    if (m_mode == Mode::Idle) { return; }
+    ++m_requestId;
+    m_mode = Mode::Idle;
+    m_holdTimer.stop();
+    m_watchdog.stop();
+    m_operation.clear();
+    hidePicker();
+    Q_EMIT contextChanged();
+    Q_EMIT finished();
 }
 
 void PickerController::copyUrl()
 {
+    if (m_mode != Mode::Picker) { return; }
     QGuiApplication::clipboard()->setText(m_url.toString());
-    hidePicker();
-    Q_EMIT finished();
+    Q_EMIT clipboardCopied();
+    finish();
 }
 
 void PickerController::cancel()
 {
-    hidePicker();
-    Q_EMIT finished();
+    if (m_mode == Mode::Launching && m_operation && !m_operation->cancel()) {
+        return; // dispatch is already in progress; wait for its result
+    }
+    finish();
 }
 
 void PickerController::hidePicker()
