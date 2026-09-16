@@ -1,17 +1,22 @@
 #include "Launcher.h"
+#include "UrlSanitizer.h"
 
 #include <KIO/ApplicationLauncherJob>
 #include <KService>
 #include <KServiceAction>
 #include <KWaylandExtras>
 #include <KWindowSystem>
+#include <KShell>
 
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QProcess>
+#include <QProcessEnvironment>
 #include <QSharedPointer>
 #include <QTimer>
 #include <QWindow>
+#include <QRegularExpression>
+#include <QStandardPaths>
 
 namespace Lob
 {
@@ -20,8 +25,9 @@ namespace
 {
 
 /// Anything that would re-interpret its arguments instead of being a browser.
-/// Lob is a network-facing URL handler whose target list is user-editable, so
-/// this check is load-bearing rather than defensive decoration.
+/// This is not a sandbox for untrusted desktop files -- launch arguments never
+/// go through a shell -- but the target list is user-editable and a mistake in
+/// it should not turn a URL into a command.
 const QStringList kBlockedExecNames = {
     QStringLiteral("sh"),      QStringLiteral("bash"),         QStringLiteral("zsh"),
     QStringLiteral("dash"),    QStringLiteral("fish"),         QStringLiteral("ksh"),
@@ -41,7 +47,38 @@ constexpr int kMaxSymlinkHops = 16;
 /// opens, possibly unfocused) beats not launching at all.
 constexpr int kActivationTokenTimeoutMs = 300;
 
+constexpr auto kCommandOption = QLatin1String("--command=");
+
 } // namespace
+
+int Launcher::programIndex(const QStringList &command)
+{
+    // `env VAR=value -- program ...` is a common desktop-entry wrapper. Where
+    // the program actually starts decides both what the safety check inspects
+    // and where our own arguments may go, so both ask this one question.
+    if (command.isEmpty()) {
+        return -1;
+    }
+    if (QFileInfo(command.constFirst()).fileName() != QLatin1String("env")) {
+        return 0;
+    }
+
+    static const QRegularExpression assignment(QStringLiteral("^[A-Za-z_][A-Za-z0-9_]*="));
+    int program = 1;
+    while (program < command.size() && assignment.match(command.at(program)).hasMatch()) {
+        ++program;
+    }
+    if (command.value(program) == QLatin1String("--")) {
+        ++program;
+    }
+    // env's own options (-i, -u NAME, -S "...") can replace the environment or
+    // re-split the command line. Rather than reimplement env, refuse to read a
+    // wrapper we do not fully understand.
+    if (program >= command.size() || command.at(program).startsWith(QLatin1Char('-'))) {
+        return -1;
+    }
+    return program;
+}
 
 Launcher::Launcher(QObject *parent)
     : QObject(parent)
@@ -74,10 +111,15 @@ bool Launcher::execIsSafe(const QString &execPath)
 
 QStringList Launcher::buildArgv(const Target &target, const QUrl &url, bool privateWindow)
 {
-    QStringList argv{target.execPath};
+    QStringList argv;
+    QStringList command = target.launchCommand(privateWindow);
+    if (command.isEmpty()) { command.append(target.execPath); }
+    if (privateWindow && !target.supportsPrivate()) { return {}; }
+    const QString profileKey = target.profileKey;
 
     const bool wantPrivate = privateWindow && target.supportsPrivate();
 
+    QStringList flags;
     switch (target.family) {
     case EngineFamily::Gecko:
         if (!target.profileKey.isEmpty()) {
@@ -85,9 +127,11 @@ QStringList Launcher::buildArgv(const Target &target, const QUrl &url, bool priv
             // are not unique across forks. Deliberately no --no-remote: without
             // it the URL reaches the already-running instance for that profile,
             // which is what we want.
-            argv << QStringLiteral("--profile") << target.profileKey;
+            flags << QStringLiteral("--profile") << profileKey;
         }
-        argv << (wantPrivate ? target.privateFlag : QStringLiteral("--new-tab"));
+        if (!command.contains(wantPrivate ? target.privateFlag : QStringLiteral("--new-tab"))) {
+            flags << (wantPrivate ? target.privateFlag : QStringLiteral("--new-tab"));
+        }
         break;
 
     case EngineFamily::Chromium:
@@ -95,45 +139,149 @@ QStringList Launcher::buildArgv(const Target &target, const QUrl &url, bool priv
             // Must precede the URL, and must stay a single argv element: a
             // space in the profile directory name otherwise truncates the value
             // and the remainder is parsed as a URL.
-            argv << QStringLiteral("--profile-directory=") + target.profileKey;
+            flags << QStringLiteral("--profile-directory=") + profileKey;
         }
-        if (wantPrivate) {
-            argv << target.privateFlag;
+        if (wantPrivate && !command.contains(target.privateFlag)) {
+            flags << target.privateFlag;
         }
         break;
 
     case EngineFamily::Unknown:
-        if (wantPrivate) {
-            argv << target.privateFlag;
+        if (wantPrivate && !command.contains(target.privateFlag)) {
+            flags << target.privateFlag;
         }
         break;
     }
 
-    argv << url.toString();
+    // Options belong before the URL, and outside Flatpak's @@u ... @@ wrapper.
+    bool inserted = false;
+    bool hasUrl = false;
+    int application = programIndex(command);
+    if (application < 0) { return {}; }
+    if (!target.flatpakId.isEmpty()) {
+        const int app = command == target.command && target.applicationIndex >= 0
+            ? target.applicationIndex : command.indexOf(target.flatpakId, application);
+        if (app < 0) { return {}; }
+        application = app;
+    }
+    for (int i = 0; i < command.size(); ++i) {
+        const QString arg = command.at(i);
+        if (i > application && wantPrivate && target.family == EngineFamily::Gecko
+            && (arg == QLatin1String("--new-tab") || arg == QLatin1String("--new-window"))) { continue; }
+        if (i > application && !target.profileKey.isEmpty()) {
+            if (arg == QLatin1String("--profile") || arg == QLatin1String("-profile") || arg == QLatin1String("-P")
+                || arg == QLatin1String("--profile-directory")) { ++i; continue; }
+            if (arg.startsWith(QLatin1String("--profile=")) || arg.startsWith(QLatin1String("--profile-directory="))) { continue; }
+        }
+        if (i > application && !inserted && (arg == QLatin1String("@@u") || arg == QLatin1String("@@")
+                          || arg == QLatin1String("--") || arg.contains(QLatin1String("%u")) || arg.contains(QLatin1String("%U")))) {
+            argv << flags;
+            inserted = true;
+        }
+        if (arg == QLatin1String("%u") || arg == QLatin1String("%U") || arg == QLatin1String("%f") || arg == QLatin1String("%F")) {
+            if (!inserted) { argv << flags; inserted = true; }
+            argv << url.toString(QUrl::FullyEncoded);
+            hasUrl = true;
+        } else if (arg == QLatin1String("%i")) {
+            if (!target.iconName.isEmpty()) { argv << QStringLiteral("--icon") << target.iconName; }
+        } else if (arg == QLatin1String("%c")) {
+            argv << target.applicationName;
+        } else if (arg == QLatin1String("%k")) {
+            argv << target.desktopFilePath;
+        } else {
+            // The spec defines field codes as whole arguments, but entries in
+            // the wild embed them (--app=%u). Substitute those and refuse the
+            // rest: an unknown code would change what the command means, and
+            // field codes are not shell substitutions to be passed through.
+            QString expanded;
+            for (int n = 0; n < arg.size(); ++n) {
+                if (arg.at(n) != QLatin1Char('%')) {
+                    expanded += arg.at(n);
+                    continue;
+                }
+                if (++n >= arg.size()) { return {}; }
+                const QChar code = arg.at(n);
+                if (code == QLatin1Char('%')) {
+                    expanded += code;
+                    continue;
+                }
+                if (code != QLatin1Char('u') && code != QLatin1Char('U')
+                    && code != QLatin1Char('f') && code != QLatin1Char('F')) { return {}; }
+                if (!inserted) { argv << flags; inserted = true; }
+                expanded += url.toString(QUrl::FullyEncoded);
+                hasUrl = true;
+            }
+            argv << expanded;
+        }
+    }
+    if (!inserted) { argv << flags; }
+    if (!hasUrl) { argv << url.toString(QUrl::FullyEncoded); }
     return argv;
+}
+
+bool Launcher::commandIsSafe(const QStringList &command)
+{
+    const int program = programIndex(command);
+    if (program < 0) { return false; }
+
+    const QString resolved = QStandardPaths::findExecutable(command.at(program));
+    if (!execIsSafe(resolved.isEmpty() ? command.at(program) : resolved)) { return false; }
+
+    // Flatpak is a launcher of its own: what it will run has to be checked too.
+    if (QFileInfo(command.at(program)).fileName() == QLatin1String("flatpak")) {
+        if (command.value(program + 1) != QLatin1String("run")) { return false; }
+        for (int n = program + 2; n < command.size(); ++n) {
+            const auto arg = command.at(n);
+            if (arg.startsWith(kCommandOption) && !execIsSafe(arg.mid(kCommandOption.size()))) { return false; }
+            if (arg == QLatin1String("--command") && !execIsSafe(command.value(n + 1))) { return false; }
+        }
+    }
+    return true;
 }
 
 void Launcher::launch(const Target &target,
                       const QUrl &url,
                       bool privateWindow,
                       QWindow *window,
-                      std::function<void()> onLaunched)
+                      Completion completion,
+                      const QString &activationToken,
+                      QSharedPointer<LaunchOperation> operation)
 {
-    const auto done = [onLaunched = std::move(onLaunched)] {
-        if (onLaunched) {
-            onLaunched();
+    const auto done = [this, completion = std::move(completion)](LaunchResult result) {
+        if (result.outcome == LaunchResult::Failed) {
+            Q_EMIT launchFailed(result.error);
+        }
+        if (completion) {
+            completion(result);
         }
     };
-
-    if (!execIsSafe(target.execPath)) {
-        Q_EMIT launchFailed(tr("Refusing to launch %1: not a browser executable.").arg(target.execPath));
-        done();
+    if (!operation) {
+        operation = QSharedPointer<LaunchOperation>::create();
+    }
+    QString reason;
+    if (!UrlSanitizer::isRoutable(url, &reason)) {
+        done({LaunchResult::Failed, reason});
         return;
     }
 
-    if (!window || !KWindowSystem::isPlatformWayland()) {
-        doLaunch(target, url, privateWindow, QString());
-        done();
+    const auto command = target.launchCommand(privateWindow);
+    if (!commandIsSafe(command.isEmpty() ? QStringList{target.execPath} : command)) {
+        done({LaunchResult::Failed, tr("Refusing to launch %1: not a browser executable.").arg(target.execPath)});
+        return;
+    }
+
+    if (privateWindow && !target.supportsPrivate()) {
+        done({LaunchResult::Failed, tr("%1 does not support private browsing.").arg(target.label)});
+        return;
+    }
+
+    if (!window || !window->isVisible() || !KWindowSystem::isPlatformWayland()) {
+        if (operation->cancelled) {
+            done({LaunchResult::Cancelled, {}});
+        } else {
+            operation->dispatched = true;
+            doLaunch(target, url, privateWindow, activationToken, done);
+        }
         return;
     }
 
@@ -143,33 +291,45 @@ void Launcher::launch(const Target &target,
     const QString appId = QFileInfo(target.storageId).completeBaseName();
 
     auto resolved = QSharedPointer<bool>::create(false);
-    auto finish = [this, target, url, privateWindow, resolved, done](const QString &token) {
+    auto finish = [this, target, url, privateWindow, resolved, done, operation](const QString &token) {
         if (*resolved) {
             return;
         }
         *resolved = true;
-        doLaunch(target, url, privateWindow, token);
-        done();
+        if (operation->cancelled) {
+            done({LaunchResult::Cancelled, {}});
+            return;
+        }
+        operation->dispatched = true;
+        doLaunch(target, url, privateWindow, token, done);
     };
 
-    // A serial ties the token to a specific input event. The picker has one
-    // because the user clicked or typed in it; the hold bar does not, since
-    // nothing was pressed -- there the serial-less overload is the correct
-    // request, and passing a stale or zero serial instead gets the token
-    // refused and the browser opens behind everything.
-    const quint32 serial = KWaylandExtras::lastInputSerial(window);
-    auto future = serial != 0 ? KWaylandExtras::xdgActivationToken(window, serial, appId)
-                              : KWaylandExtras::xdgActivationToken(window, appId);
-    future.then(this, finish);
+    // This overload picks up the last input serial itself. That matters for the
+    // hold bar, which nothing was pressed in: passing a serial we looked up per
+    // window would be zero there, and a request carrying a zero or stale serial
+    // is refused, leaving the browser behind everything. Keep the surface mapped
+    // for the roundtrip; the compositor decides whether to grant activation.
+    KWaylandExtras::xdgActivationToken(window, appId).then(this, finish);
 
     QTimer::singleShot(kActivationTokenTimeoutMs, this, [finish] {
         finish(QString());
     });
 }
 
-void Launcher::doLaunch(const Target &target, const QUrl &url, bool privateWindow, const QString &activationToken)
+void Launcher::doLaunch(const Target &target, const QUrl &url, bool privateWindow, const QString &activationToken, Completion completion)
 {
-    const bool needsArgv = !target.profileKey.isEmpty();
+    const bool needsArgv = !target.profileKey.isEmpty() || privateWindow;
+    const auto startJob = [this, target, activationToken, completion](const KService::Ptr &service, const QList<QUrl> &urls) {
+        auto *job = new KIO::ApplicationLauncherJob(service, this);
+        job->setUrls(urls);
+        job->setStartupId(activationToken.toUtf8());
+        connect(job, &KJob::result, this, [completion, target](KJob *finished) {
+            // KIO error text can contain the URL. Keep diagnostics free of its credentials/query.
+            completion(finished->error() ? LaunchResult{LaunchResult::Failed,
+                tr("Could not launch %1 (error %2).").arg(target.label).arg(finished->error())} : LaunchResult{});
+        });
+        job->start();
+    };
 
     // Without a profile to select, KIO knows better than we do: it expands
     // field codes, honours Terminal=, and -- crucially -- reaches
@@ -178,60 +338,44 @@ void Launcher::doLaunch(const Target &target, const QUrl &url, bool privateWindo
     if (!needsArgv) {
         const KService::Ptr service = KService::serviceByStorageId(target.storageId);
         if (service) {
-            KIO::ApplicationLauncherJob *job = nullptr;
-
-            if (privateWindow && target.supportsPrivate()) {
-                const auto actions = service->actions();
-                for (const KServiceAction &action : actions) {
-                    if (action.name() == QLatin1String("new-private-window")) {
-                        job = new KIO::ApplicationLauncherJob(action, this);
-                        break;
-                    }
-                }
-            }
-            if (!job) {
-                job = new KIO::ApplicationLauncherJob(service, this);
-            }
-
-            job->setUrls({url});
-            if (!activationToken.isEmpty()) {
-                job->setStartupId(activationToken.toUtf8());
-            }
-            job->start();
+            startJob(service, {url});
             return;
         }
     }
 
     const QStringList argv = buildArgv(target, url, privateWindow);
+    if (argv.isEmpty()) {
+        completion({LaunchResult::Failed, tr("Unsupported desktop launch command for %1.").arg(target.label)});
+        return;
+    }
     const QString program = argv.constFirst();
     const QStringList arguments = argv.mid(1);
 
-    // The static startDetached overload forks from our own live environment and
-    // takes no QProcessEnvironment, so the token has to be set around the call
-    // and restored immediately after. Safe only because this runs on the single
-    // main thread -- if this daemon ever grows a worker thread, this becomes a
-    // data race and must move to a QProcess instance with setProcessEnvironment.
-    const bool hasToken = !activationToken.isEmpty();
-    const bool hadPrevious = qEnvironmentVariableIsSet("XDG_ACTIVATION_TOKEN");
-    const QByteArray previous = hadPrevious ? qgetenv("XDG_ACTIVATION_TOKEN") : QByteArray();
-
-    if (hasToken) {
-        qputenv("XDG_ACTIVATION_TOKEN", activationToken.toUtf8());
+    if (target.terminal) {
+        // The command is already expanded; escape literal percent signs before
+        // handing it to KIO's desktop-entry parser a second time.
+        auto escaped = argv;
+        for (auto &arg : escaped) { arg.replace(QLatin1Char('%'), QStringLiteral("%%")); }
+        KService::Ptr service(new KService(target.applicationName, KShell::joinArgs(escaped), target.iconName));
+        service->setTerminal(true);
+        service->setTerminalOptions(target.terminalOptions);
+        service->setWorkingDirectory(target.workingDirectory);
+        startJob(service, {});
+        return;
     }
 
-    const bool started = QProcess::startDetached(program, arguments);
-
-    if (hasToken) {
-        if (hadPrevious) {
-            qputenv("XDG_ACTIVATION_TOKEN", previous);
-        } else {
-            qunsetenv("XDG_ACTIVATION_TOKEN");
-        }
+    QProcess process;
+    process.setProgram(program);
+    process.setArguments(arguments);
+    process.setWorkingDirectory(target.workingDirectory);
+    auto environment = QProcessEnvironment::systemEnvironment();
+    environment.remove(QStringLiteral("XDG_ACTIVATION_TOKEN"));
+    if (!activationToken.isEmpty()) {
+        environment.insert(QStringLiteral("XDG_ACTIVATION_TOKEN"), activationToken);
     }
-
-    if (!started) {
-        Q_EMIT launchFailed(tr("Could not start %1.").arg(program));
-    }
+    process.setProcessEnvironment(environment);
+    const bool started = process.startDetached();
+    completion(started ? LaunchResult{} : LaunchResult{LaunchResult::Failed, tr("Could not start %1.").arg(program)});
 }
 
 } // namespace Lob

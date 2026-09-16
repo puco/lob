@@ -6,3 +6,13 @@ foreach(test RuleEngineTest RuleStoreTest BrowserProfilesTest LauncherTest Defau
     add_test(NAME ${test} COMMAND ${test})
     ecm_mark_as_test(${test})
 endforeach()
+
+add_executable(LaunchRecorder LaunchRecorder.cpp)
+target_link_libraries(LaunchRecorder PRIVATE Qt6::Core)
+add_executable(LauncherIntegrationTest LauncherIntegrationTest.cpp)
+target_link_libraries(LauncherIntegrationTest PRIVATE lobcore Qt6::Test)
+add_dependencies(LauncherIntegrationTest LaunchRecorder)
+find_program(DBUS_RUN_SESSION dbus-run-session REQUIRED)
+add_test(NAME LauncherIntegrationTest COMMAND ${DBUS_RUN_SESSION} --config-file=${CMAKE_CURRENT_SOURCE_DIR}/dbus-session.conf -- $<TARGET_FILE:LauncherIntegrationTest>)
+set_tests_properties(LauncherIntegrationTest PROPERTIES TIMEOUT 30)
+ecm_mark_as_test(LauncherIntegrationTest)

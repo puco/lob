@@ -13,8 +13,8 @@ enum class EngineFamily {
 };
 
 /**
- * Browser means "we fingerprinted the engine and confirmed it by finding its
- * profile store". Everything else that registers for x-scheme-handler/https is
+ * Browser means a recognized engine or a WebBrowser desktop category.
+ * Everything else that registers for x-scheme-handler/https is
  * an OtherHandler: still routable, just not enabled by default. chatgpt.desktop
  * is the motivating example -- it claims https for OAuth callbacks, and whether
  * sending a link there is useful is the user's call, not ours.
@@ -25,12 +25,23 @@ enum class TargetKind {
 };
 
 struct Target {
+    bool operator==(const Target &) const = default;
     QString id; // stable identity; "<storageId>" or "<storageId>#<profileKey>"
     QString label;
     QString iconName;
 
     QString storageId; // desktop file id, e.g. "microsoft-edge.desktop"
     QString execPath;  // resolved absolute binary
+    QStringList command; // desktop Exec tokens, including wrappers and field codes
+    QStringList privateCommand;
+    QString desktopFilePath;
+    QString applicationName;
+    QString flatpakId;
+    QString browserExecutable;
+    QString workingDirectory;
+    bool terminal = false;
+    QString terminalOptions;
+    int applicationIndex = -1; // actual application/ref after env or flatpak options
 
     EngineFamily family = EngineFamily::Unknown;
     TargetKind kind = TargetKind::OtherHandler;
@@ -50,6 +61,17 @@ struct Target {
     bool supportsPrivate() const
     {
         return !privateFlag.isEmpty();
+    }
+
+    QStringList launchCommand(bool privateWindow) const
+    {
+        // Known engines use the original command plus a vendor-specific flag,
+        // retaining custom environment and user-data-dir options. An unknown
+        // engine may need the entire advertised desktop action.
+        if (privateWindow && !privateCommand.isEmpty() && (family == EngineFamily::Unknown || command.isEmpty())) {
+            return privateCommand;
+        }
+        return command;
     }
 };
 

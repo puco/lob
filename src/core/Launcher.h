@@ -3,15 +3,34 @@
 #include "Target.h"
 
 #include <QObject>
-
-#include <functional>
+#include <QSharedPointer>
 #include <QStringList>
 #include <QUrl>
+
+#include <functional>
 
 class QWindow;
 
 namespace Lob
 {
+
+struct LaunchOperation {
+    bool cancelled = false;
+    bool dispatched = false;
+    bool cancel()
+    {
+        if (dispatched) {
+            return false;
+        }
+        cancelled = true;
+        return true;
+    }
+};
+
+struct LaunchResult {
+    enum Outcome { Started, Failed, Cancelled } outcome = Started;
+    QString error;
+};
 
 class Launcher : public QObject
 {
@@ -25,15 +44,17 @@ public:
      * activation token is minted from it first so the browser comes to the
      * front instead of being demoted by focus-stealing prevention.
      *
-     * @param onLaunched invoked once the process has actually been started.
-     *        Minting a token is asynchronous, and @p window has to stay mapped
-     *        until it arrives -- hide it from here, not before.
+     * Completion reports dispatch success, failure, or cancellation. It does
+     * not report page-load success. Keep the window mapped until completion.
      */
-    void launch(const Target &target,
-                const QUrl &url,
-                bool privateWindow,
-                QWindow *window,
-                std::function<void()> onLaunched = {});
+    using Completion = std::function<void(LaunchResult)>;
+    virtual void launch(const Target &target,
+                        const QUrl &url,
+                        bool privateWindow,
+                        QWindow *window,
+                        Completion completion = {},
+                        const QString &activationToken = {},
+                        QSharedPointer<LaunchOperation> operation = {});
 
     /// Command line this target would run. Public for testing.
     static QStringList buildArgv(const Target &target, const QUrl &url, bool privateWindow);
@@ -46,11 +67,19 @@ public:
      */
     static bool execIsSafe(const QString &execPath);
 
+    /// Whether a whole desktop-entry command line is safe to run, including
+    /// what an `env` wrapper or `flatpak run` would end up executing.
+    static bool commandIsSafe(const QStringList &command);
+
+    /// Index of the program inside a command line, past any `env` wrapper.
+    /// -1 when the wrapper cannot be read with confidence.
+    static int programIndex(const QStringList &command);
+
 Q_SIGNALS:
     void launchFailed(const QString &message);
 
 private:
-    void doLaunch(const Target &target, const QUrl &url, bool privateWindow, const QString &activationToken);
+    void doLaunch(const Target &target, const QUrl &url, bool privateWindow, const QString &activationToken, Completion completion);
 };
 
 } // namespace Lob

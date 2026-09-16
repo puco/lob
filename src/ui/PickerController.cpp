@@ -326,7 +326,7 @@ void PickerController::runDecision()
         return;
     }
 
-    m_launcher->launch(target, m_url, m_decision.privateWindow, m_window, [this] {
+    m_launcher->launch(target, m_url, m_decision.privateWindow, m_window, [this](LaunchResult) {
         hidePicker();
         Q_EMIT finished();
     });
@@ -358,7 +358,7 @@ void PickerController::choose(int index, bool privateWindow, bool remember)
     // The window stays mapped until the launch has gone through: the
     // activation token is minted from it asynchronously, and hiding it first
     // loses the token and with it the browser's claim to the foreground.
-    m_launcher->launch(target, m_url, privateWindow, m_window, [this] {
+    m_launcher->launch(target, m_url, privateWindow, m_window, [this](LaunchResult) {
         hidePicker();
         Q_EMIT finished();
     });
