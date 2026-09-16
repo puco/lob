@@ -12,6 +12,10 @@ class TargetModel : public QAbstractListModel
 {
     Q_OBJECT
 
+    /// rowCount() is invokable but not bindable; QML needs a notifying
+    /// property to lay the grid out when the target list changes.
+    Q_PROPERTY(int count READ count NOTIFY countChanged)
+
 public:
     enum Roles {
         LabelRole = Qt::UserRole + 1,
@@ -27,10 +31,14 @@ public:
     void setTargets(const QList<Target> &targets);
     const QList<Target> &targets() const;
     Target at(int row) const;
+    int count() const;
 
     int rowCount(const QModelIndex &parent = {}) const override;
     QVariant data(const QModelIndex &index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
+
+Q_SIGNALS:
+    void countChanged();
 
 private:
     QList<Target> m_targets;

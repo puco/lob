@@ -10,6 +10,11 @@ Window {
     property bool rememberChoice: false
     property int current: 0
 
+    // Caps how wide the overlay content gets on a large screen, and how many
+    // target cells fit on one row.
+    readonly property int contentWidth:
+        Math.min(width - Kirigami.Units.gridUnit * 4, Kirigami.Units.gridUnit * 44)
+
     visible: false
     flags: Qt.FramelessWindowHint
     color: "transparent"
@@ -106,7 +111,7 @@ Window {
 
         ColumnLayout {
             anchors.centerIn: parent
-            width: Math.min(parent.width - Kirigami.Units.gridUnit * 4, Kirigami.Units.gridUnit * 44)
+            width: root.contentWidth
             spacing: Kirigami.Units.largeSpacing
 
             // The host is the thing you actually decide on, so it carries the
@@ -165,12 +170,35 @@ Window {
             }
 
             // ---- Picker ----
+            //
+            // Centred and sized to its contents rather than stretched: a Flow
+            // filling the full width packs fixed-width cells from the left and
+            // leaves the remainder as dead space on the right, which reads as a
+            // layout bug even though the cells themselves are correct.
             Kirigami.Card {
-                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignHCenter
                 visible: !picker.holding
 
-                contentItem: Flow {
-                    spacing: Kirigami.Units.smallSpacing
+                contentItem: GridLayout {
+                    id: grid
+
+                    readonly property int cellWidth: Kirigami.Units.gridUnit * 7
+                    readonly property int cellHeight: Kirigami.Units.gridUnit * 6
+                    readonly property int maxColumns:
+                        Math.max(1, Math.floor(root.contentWidth / (cellWidth + Kirigami.Units.smallSpacing)))
+
+                    // Balance the rows instead of leaving one item stranded:
+                    // five targets read better as 3 + 2 than as 4 + 1.
+                    columns: {
+                        var n = Math.min(picker.targets.count, maxColumns)
+                        if (n < 1)
+                            return 1
+                        var rows = Math.ceil(picker.targets.count / n)
+                        return Math.ceil(picker.targets.count / rows)
+                    }
+
+                    rowSpacing: Kirigami.Units.smallSpacing
+                    columnSpacing: Kirigami.Units.smallSpacing
 
                     Repeater {
                         model: picker.targets
@@ -182,8 +210,8 @@ Window {
                             required property string shortcut
                             required property bool isBrowser
 
-                            width: Kirigami.Units.gridUnit * 9
-                            height: Kirigami.Units.gridUnit * 8
+                            Layout.preferredWidth: grid.cellWidth
+                            Layout.preferredHeight: grid.cellHeight
                             highlighted: root.current === index
                             opacity: isBrowser ? 1.0 : 0.65
 
@@ -195,8 +223,8 @@ Window {
                                 Kirigami.Icon {
                                     Layout.alignment: Qt.AlignHCenter
                                     source: iconName
-                                    implicitWidth: Kirigami.Units.iconSizes.large
-                                    implicitHeight: Kirigami.Units.iconSizes.large
+                                    implicitWidth: Kirigami.Units.iconSizes.medium
+                                    implicitHeight: Kirigami.Units.iconSizes.medium
                                 }
 
                                 QQC2.Label {
@@ -206,6 +234,7 @@ Window {
                                     wrapMode: Text.Wrap
                                     maximumLineCount: 2
                                     elide: Text.ElideRight
+                                    font: Kirigami.Theme.smallFont
                                 }
 
                                 QQC2.Label {

@@ -13,6 +13,7 @@ void TargetModel::setTargets(const QList<Target> &targets)
     beginResetModel();
     m_targets = targets;
     endResetModel();
+    Q_EMIT countChanged();
 }
 
 const QList<Target> &TargetModel::targets() const
@@ -26,6 +27,11 @@ Target TargetModel::at(int row) const
         return {};
     }
     return m_targets.at(row);
+}
+
+int TargetModel::count() const
+{
+    return m_targets.size();
 }
 
 int TargetModel::rowCount(const QModelIndex &parent) const
