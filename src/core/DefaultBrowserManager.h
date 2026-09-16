@@ -2,9 +2,16 @@
 
 #include <QString>
 #include <QStringList>
+#include <functional>
 
 namespace Lob
 {
+
+// Platform lookups can be substituted for isolated association tests.
+struct AssociationBackend {
+    std::function<QStringList()> currentHandlers;
+    std::function<bool(const QString &)> handlerExists;
+};
 
 /**
  * Claims and relinquishes the system http/https handler.
@@ -24,10 +31,11 @@ public:
 
     /// Records the present handlers, then registers us. Refuses to record
     /// ourselves, so taking over twice cannot destroy the restore target.
-    static bool claim(QString *error = nullptr);
+    static bool claim(QString *error = nullptr, const AssociationBackend &backend = {});
 
     /// Puts back whatever was recorded by claim().
-    static bool restore(QString *error = nullptr);
+    static bool restore(QString *error = nullptr, const AssociationBackend &backend = {});
+    static QString previousHandler(const QString &scheme);
 
     /**
      * ~/.config/kde-mimeapps.list outranks ~/.config/mimeapps.list in the
