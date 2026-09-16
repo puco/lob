@@ -51,7 +51,7 @@ private:
         bool forcePicker = false;
     };
 
-    void enqueue(const QUrl &url, const QString &token, bool forcePicker);
+    void enqueue(const QUrl &rawUrl, const QString &token, bool forcePicker);
     void processQueue();
     void onPickerFinished();
 

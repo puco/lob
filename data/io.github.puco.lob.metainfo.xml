@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.puco.lob</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+
+  <name>Lob</name>
+  <summary>Choose which browser opens each link</summary>
+
+  <description>
+    <p>
+      Lob registers as the system handler for http and https links and decides
+      where each one should go, instead of sending everything to a single
+      default browser.
+    </p>
+    <p>
+      Links that match a rule open straight away, after a brief bar that can be
+      interrupted to choose something else. Anything unrecognised shows a
+      keyboard-driven picker listing installed browsers and their profiles,
+      with an option to remember the choice for that host.
+    </p>
+    <p>
+      Lob handles http and https only. It does not claim mail links, local
+      files or PDFs.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">io.github.puco.lob.desktop</launchable>
+
+  <categories>
+    <category>Network</category>
+    <category>Utility</category>
+  </categories>
+
+  <keywords>
+    <keyword>browser</keyword>
+    <keyword>link</keyword>
+    <keyword>url</keyword>
+    <keyword>default browser</keyword>
+  </keywords>
+
+  <provides>
+    <binary>lob</binary>
+  </provides>
+
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="0.1.0" date="2026-09-16">
+      <description>
+        <p>First working version: browser and profile discovery, a keyboard-driven
+        picker, rules with a hold bar, and a resident daemon.</p>
+      </description>
+    </release>
+  </releases>
+</component>

@@ -46,6 +46,12 @@ public:
     int holdMs() const;
     void setHoldMs(int ms);
 
+    bool stripTracking() const;
+    void setStripTracking(bool strip);
+
+    /// Parameter patterns to strip; "*" suffix matches by prefix.
+    QStringList trackingParameters() const;
+
     /// Ids of "other handler" targets the user has explicitly enabled.
     QStringList enabledOtherHandlers() const;
     void setOtherHandlerEnabled(const QString &targetId, bool enabled);
@@ -59,6 +65,8 @@ private:
     QList<Rule> m_rules;
     QString m_fallbackTargetId;
     int m_holdMs = 600;
+    bool m_stripTracking = true;
+    QStringList m_trackingParameters;
     QStringList m_enabledOtherHandlers;
     QFileSystemWatcher *m_watcher;
     bool m_writing = false;

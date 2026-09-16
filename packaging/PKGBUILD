@@ -1,0 +1,33 @@
+# Maintainer: puco <2155990+puco@users.noreply.github.com>
+pkgname=lob
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Choose which browser opens each link"
+arch=('x86_64')
+url="https://github.com/puco/lob"
+license=('GPL-3.0-or-later')
+depends=(
+  'qt6-base' 'qt6-declarative' 'qt6-svg'
+  'kirigami' 'kirigami-addons' 'ki18n' 'kcoreaddons' 'kconfig' 'kdbusaddons'
+  'knotifications' 'kwindowsystem' 'kiconthemes' 'kcolorscheme' 'kcrash'
+  'kstatusnotifieritem' 'kservice' 'kio' 'layer-shell-qt' 'qqc2-desktop-style'
+)
+makedepends=('cmake' 'ninja' 'extra-cmake-modules')
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cmake -B build -S "$srcdir/$pkgname-$pkgver" -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DBUILD_TESTING=ON
+  cmake --build build
+}
+
+check() {
+  ctest --test-dir build --output-on-failure
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+}

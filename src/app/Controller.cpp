@@ -116,8 +116,17 @@ void Controller::handleUrls(const QList<QUrl> &urls, const QString &activationTo
     }
 }
 
-void Controller::enqueue(const QUrl &url, const QString &token, bool forcePicker)
+void Controller::enqueue(const QUrl &rawUrl, const QString &token, bool forcePicker)
 {
+    // Strip before the rules see it, so a rule matching on query parameters
+    // matches what will actually be opened rather than what arrived.
+    const QUrl url = m_store->stripTracking()
+        ? UrlSanitizer::strip(rawUrl, m_store->trackingParameters())
+        : rawUrl;
+    if (url != rawUrl) {
+        qCDebug(LOG_CONTROLLER) << "stripped tracking parameters:" << rawUrl.toString() << "->" << url.toString();
+    }
+
     // While paused, links still open -- they just skip the question. Queueing
     // them up to ask later would be worse than picking a sensible browser now.
     if (m_tray && m_tray->isPaused() && !forcePicker) {

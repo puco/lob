@@ -2,6 +2,7 @@
 #include "core/UrlSanitizer.h"
 
 #include <QTest>
+#include <QUrlQuery>
 
 using namespace Lob;
 
@@ -87,6 +88,41 @@ private Q_SLOTS:
         QVERIFY(!Launcher::execIsSafe(QStringLiteral("/usr/bin/env")));
         QVERIFY(!Launcher::execIsSafe(QString()));
         QVERIFY(Launcher::execIsSafe(QStringLiteral("/usr/bin/microsoft-edge-stable")));
+    }
+
+    void trackingParametersAreStrippedIncludingPrefixPatterns()
+    {
+        const QStringList patterns = UrlSanitizer::defaultTrackingParameters();
+        const QUrl cleaned = UrlSanitizer::strip(
+            QUrl(QStringLiteral("https://shop.example/item?id=42&utm_source=news&utm_campaign=x&fbclid=abc&ref=friend")),
+            patterns);
+
+        QUrlQuery query(cleaned);
+        QVERIFY(!query.hasQueryItem(QStringLiteral("utm_source")));
+        QVERIFY(!query.hasQueryItem(QStringLiteral("utm_campaign")));
+        QVERIFY(!query.hasQueryItem(QStringLiteral("fbclid")));
+        QCOMPARE(query.queryItemValue(QStringLiteral("id")), QStringLiteral("42"));
+        QCOMPARE(query.queryItemValue(QStringLiteral("ref")), QStringLiteral("friend"));
+    }
+
+    void aQueryOfNothingButTrackingIsEmptiedEntirely()
+    {
+        // The common case for this feature: a newsletter link that is just the
+        // page plus its campaign tags. Leaving it alone would exempt precisely
+        // the URLs most worth cleaning.
+        const QUrl cleaned = UrlSanitizer::strip(
+            QUrl(QStringLiteral("https://example.com/watch?utm_source=news&fbclid=x")),
+            UrlSanitizer::defaultTrackingParameters());
+        QCOMPARE(cleaned.toString(), QStringLiteral("https://example.com/watch"));
+        QVERIFY(!cleaned.hasQuery());
+    }
+
+    void urlsWithoutTrackingAreReturnedUnchanged()
+    {
+        const QUrl url(QStringLiteral("https://example.com/a?b=c"));
+        QCOMPARE(UrlSanitizer::strip(url, UrlSanitizer::defaultTrackingParameters()), url);
+        const QUrl noQuery(QStringLiteral("https://example.com/a"));
+        QCOMPARE(UrlSanitizer::strip(noQuery, UrlSanitizer::defaultTrackingParameters()), noQuery);
     }
 
     void onlyHttpUrlsWithoutCredentialsAreRoutable()

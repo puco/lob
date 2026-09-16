@@ -39,6 +39,7 @@ set(LOB_APP_ID "io.github.puco.lob")
 # the application runs, rather than a recompiled copy of it.
 add_library(lobcore STATIC
     src/core/BrowserProfiles.cpp
+    src/core/DefaultBrowserManager.cpp
     src/core/Launcher.cpp
     src/core/RuleEngine.cpp
     src/core/RuleStore.cpp
@@ -104,6 +105,8 @@ configure_file(data/lob.service.in ${CMAKE_CURRENT_BINARY_DIR}/lob.service @ONLY
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${LOB_APP_ID}.desktop
         DESTINATION ${KDE_INSTALL_APPDIR})
+install(FILES data/${LOB_APP_ID}.metainfo.xml
+        DESTINATION ${KDE_INSTALL_METAINFODIR})
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${LOB_APP_ID}.service
         DESTINATION ${KDE_INSTALL_DBUSSERVICEDIR})
 # systemd reads user units from <libdir>/systemd/user only under a system

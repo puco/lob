@@ -1,5 +1,7 @@
 #include "RuleStore.h"
 
+#include "UrlSanitizer.h"
+
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -135,6 +137,13 @@ void RuleStore::load()
     const QJsonObject root = doc.object();
     m_fallbackTargetId = root.value(QStringLiteral("fallbackTarget")).toString();
     m_holdMs = root.value(QStringLiteral("holdMs")).toInt(600);
+    m_stripTracking = root.value(QStringLiteral("stripTracking")).toBool(true);
+
+    m_trackingParameters.clear();
+    const QJsonArray tracking = root.value(QStringLiteral("trackingParameters")).toArray();
+    for (const QJsonValue &value : tracking) {
+        m_trackingParameters << value.toString();
+    }
 
     m_enabledOtherHandlers.clear();
     const QJsonArray enabled = root.value(QStringLiteral("enabledOtherHandlers")).toArray();
@@ -187,6 +196,10 @@ bool RuleStore::save()
     QJsonObject root;
     root.insert(QStringLiteral("version"), kSchemaVersion);
     root.insert(QStringLiteral("holdMs"), m_holdMs);
+    root.insert(QStringLiteral("stripTracking"), m_stripTracking);
+    if (!m_trackingParameters.isEmpty()) {
+        root.insert(QStringLiteral("trackingParameters"), QJsonArray::fromStringList(m_trackingParameters));
+    }
     if (!m_fallbackTargetId.isEmpty()) {
         root.insert(QStringLiteral("fallbackTarget"), m_fallbackTargetId);
     }
@@ -292,6 +305,25 @@ void RuleStore::setHoldMs(int ms)
     m_holdMs = qMax(0, ms);
     save();
     Q_EMIT changed();
+}
+
+bool RuleStore::stripTracking() const
+{
+    return m_stripTracking;
+}
+
+void RuleStore::setStripTracking(bool strip)
+{
+    m_stripTracking = strip;
+    save();
+    Q_EMIT changed();
+}
+
+QStringList RuleStore::trackingParameters() const
+{
+    // Absent from the file means "the built-in list"; an explicitly empty
+    // list in the file is a deliberate choice and is honoured.
+    return m_trackingParameters.isEmpty() ? UrlSanitizer::defaultTrackingParameters() : m_trackingParameters;
 }
 
 QStringList RuleStore::enabledOtherHandlers() const

@@ -1,4 +1,5 @@
 #include "app/Controller.h"
+#include "core/DefaultBrowserManager.h"
 #include "core/Launcher.h"
 #include "core/RuleEngine.h"
 #include "core/RuleStore.h"
@@ -146,6 +147,40 @@ int runExplain(const QString &rawUrl)
     return 0;
 }
 
+int runDefaultBrowser(const QString &mode)
+{
+    QTextStream out(stdout);
+
+    if (mode == QLatin1String("--status")) {
+        out << "default browser: " << (Lob::DefaultBrowserManager::isDefault() ? "lob" : "not lob") << '\n';
+        const QStringList handlers = Lob::DefaultBrowserManager::currentHandlers();
+        const QStringList types = Lob::DefaultBrowserManager::handledMimeTypes();
+        for (int i = 0; i < types.size(); ++i) {
+            out << "  " << types.at(i) << " -> " << (handlers.at(i).isEmpty() ? QStringLiteral("(unset)") : handlers.at(i))
+                << '\n';
+        }
+        const QString shadow = Lob::DefaultBrowserManager::shadowingConfig();
+        if (!shadow.isEmpty()) {
+            out << "warning: " << shadow << " sets a default that takes precedence over ours\n";
+        }
+        return 0;
+    }
+
+    QString error;
+    const bool claiming = mode == QLatin1String("--set-default");
+    const bool ok = claiming ? Lob::DefaultBrowserManager::claim(&error) : Lob::DefaultBrowserManager::restore(&error);
+
+    if (!error.isEmpty()) {
+        out << error << '\n';
+    }
+    if (!ok) {
+        return 1;
+    }
+
+    out << (claiming ? "lob now handles http and https\n" : "previous browser restored\n");
+    return 0;
+}
+
 /// KDBusService hands us the inbound activation token via the environment and
 /// clears it once the signal returns, so it has to be taken synchronously --
 /// any queued call or nested event loop would lose it.
@@ -179,6 +214,14 @@ int main(int argc, char *argv[])
         QCoreApplication app(argc, argv);
         setupIdentity();
         return runList();
+    }
+
+    for (const auto &mode : {"--set-default", "--restore-default", "--status"}) {
+        if (rawArgs.contains(QLatin1String(mode))) {
+            QCoreApplication app(argc, argv);
+            setupIdentity();
+            return runDefaultBrowser(QLatin1String(mode));
+        }
     }
 
     if (rawArgs.contains(QStringLiteral("--explain"))) {
@@ -227,7 +270,8 @@ int main(int argc, char *argv[])
     const bool daemonMode = rawArgs.contains(QStringLiteral("--daemon"));
 
     if (!daemonMode && rawArgs.size() < 2) {
-        err << "usage: lob [--daemon] [--pick] [--list] [--explain <url>] <url>\n";
+        err << "usage: lob [--daemon] [--pick] <url>\n"
+               "       lob --list | --explain <url> | --status | --set-default | --restore-default\n";
         return 2;
     }
 
