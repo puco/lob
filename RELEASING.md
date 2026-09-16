@@ -35,6 +35,11 @@ before it publishes anything.
 
 ## Updating the AUR
 
+> Not submitted yet: AUR account registration was closed when 0.1 shipped.
+> Both `lob` and `lob-git` are unclaimed and both build cleanly, so this
+> becomes possible as soon as registration reopens. Until then the release
+> asset is the install path, and the README says so.
+
 The release attaches `aur-lob.tar.gz` containing a `PKGBUILD` and `.SRCINFO`
 with the real checksum already filled in. To publish:
 

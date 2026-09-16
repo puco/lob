@@ -85,10 +85,13 @@ jobs:
           cat > notes.md <<EOF
           ## Install
 
-          From the AUR:
+          On Arch, build the attached package directly -- its PKGBUILD carries
+          this release's checksum, so the source is verified before building:
 
           \`\`\`bash
-          paru -S lob        # or: yay -S lob
+          curl -LO https://github.com/puco/lob/releases/download/${{ steps.version.outputs.tag }}/aur-lob.tar.gz
+          tar xzf aur-lob.tar.gz
+          makepkg -si
           \`\`\`
 
           Then make it your link handler:

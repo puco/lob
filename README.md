@@ -12,11 +12,23 @@ everything to one default browser.
 
 ## Install
 
-From the AUR:
+### Arch
+
+The release ships a ready-to-build package, so no AUR account is involved:
 
 ```bash
-paru -S lob        # or lob-git to track main
+curl -LO https://github.com/puco/lob/releases/latest/download/aur-lob.tar.gz
+tar xzf aur-lob.tar.gz
+makepkg -si
 ```
+
+That PKGBUILD carries the release tarball's real checksum, so the download is
+verified before anything is built.
+
+> **Not on the AUR yet.** `lob` and `lob-git` are prepared and both build
+> cleanly, but AUR account registration is closed at the time of writing. Once
+> it reopens they will be submitted under those names and this becomes
+> `paru -S lob`.
 
 Then start the daemon and claim the link handler:
 
