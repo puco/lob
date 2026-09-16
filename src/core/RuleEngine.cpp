@@ -12,10 +12,11 @@ namespace
 Decision fromRule(const Rule &rule, int index, Decision::Source source)
 {
     Decision decision;
-    decision.source = rule.action == RuleAction::Ask ? Decision::Source::Ask : source;
+    decision.source = source;
     decision.action = rule.action;
     decision.targetId = rule.targetId;
     decision.privateWindow = rule.privateWindow;
+    decision.legacyTarget = rule.targetVersion == 1;
     decision.ruleIndex = index;
     return decision;
 }
@@ -54,17 +55,17 @@ bool RuleEngine::matches(const Rule &rule, const QUrl &url)
             return false;
         }
         const QString patternHost = pattern.left(slash);
-        const QString patternPath = pattern.mid(slash);
-        return host == patternHost && url.path().startsWith(patternPath, Qt::CaseInsensitive);
+        const QString patternPath = rule.pattern.trimmed().mid(slash);
+        return host == patternHost && url.path().startsWith(patternPath, rule.caseSensitive ? Qt::CaseSensitive : Qt::CaseInsensitive);
     }
 
-    case MatchKind::Regex: {
-        const QRegularExpression expression(rule.pattern, QRegularExpression::CaseInsensitiveOption);
-        if (!expression.isValid()) {
-            return false;
-        }
-        return expression.match(url.toString()).hasMatch();
-    }
+    case MatchKind::Regex:
+        // Compiled once by whoever built the rule; an invalid pattern never
+        // gets past RuleStore's validation and matches nothing here. An
+        // uncompiled expression is empty, and an empty one would match every
+        // URL, so it has to be refused rather than run.
+        return !rule.expression.pattern().isEmpty() && rule.expression.isValid()
+            && rule.expression.match(url.toString()).hasMatch();
     }
 
     return false;

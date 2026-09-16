@@ -92,14 +92,18 @@ the modifier is held in the application that opened the link, not in Lob.
 ## Configuration
 
 `~/.config/lob/rules.json`, watched, so edits apply without a restart. A
-malformed file is ignored rather than overwritten.
+malformed or unreadable file leaves the last valid configuration active and
+blocks saves until it is repaired, so a half-finished edit never costs you the
+rules you already had. Deleting the file resets Lob to its defaults, which is
+what deleting it is for. Save conflicts and write failures are reported rather
+than overwriting an edit made elsewhere.
 
-```jsonc
+```json
 {
   "version": 1,
-  "holdMs": 600,                     // 0 skips the hold bar entirely
+  "holdMs": 600,
   "stripTracking": true,
-  "fallbackTarget": "",              // used when nothing matches; empty = ask
+  "fallbackTarget": "",
   "enabledOtherHandlers": ["chatgpt.desktop"],
   "rules": [
     { "match": "hostSuffix", "pattern": "corp.example",
@@ -118,6 +122,12 @@ malformed file is ignored rather than overwritten.
 `match` is `host`, `hostSuffix`, `pathPrefix` or `regex`. `hostSuffix` covers
 the bare domain as well as subdomains. `action` is `open`, `ask` or `copy`.
 Target ids come from `lob --list`.
+
+The file is strict JSON (no comments). `holdMs` is an integer from 0 to 60000;
+zero skips the hold bar. An empty `fallbackTarget` means ask. An omitted
+`trackingParameters` uses the built-in list, while `[]` disables all stripping.
+Path-prefix and regex rules support `"caseSensitive": true`. Omission keeps
+version 1's case-insensitive behavior; host comparisons are always insensitive.
 
 Explicit rules always win over remembered ones, wherever they sit in the file,
 so a choice made in passing can never shadow one you wrote deliberately.

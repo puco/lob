@@ -15,6 +15,7 @@ Rule rule(MatchKind kind, const QString &pattern, const QString &target, bool re
     r.action = RuleAction::Open;
     r.targetId = target;
     r.remembered = remembered;
+    r.compile();
     return r;
 }
 
@@ -99,7 +100,8 @@ private Q_SLOTS:
 
         const Decision d = RuleEngine::decide(QUrl(QStringLiteral("https://bank.example/")), rules,
                                               QStringLiteral("fallback"));
-        QCOMPARE(d.source, Decision::Source::Ask);
+        QCOMPARE(d.source, Decision::Source::Rule);
+        QCOMPARE(d.ruleIndex, 0);
         QVERIFY(!d.opensWithoutAsking());
     }
 
@@ -112,6 +114,33 @@ private Q_SLOTS:
 
         const Decision none = RuleEngine::decide(QUrl(QStringLiteral("https://nowhere.example/")), {});
         QCOMPARE(none.source, Decision::Source::Ask);
+    }
+
+    void caseSensitivityIsExplicitAndPreservesV1Default()
+    {
+        auto r = rule(MatchKind::PathPrefix, QStringLiteral("example.com/Work"), QStringLiteral("a"));
+        QVERIFY(RuleEngine::matches(r, QUrl(QStringLiteral("https://example.com/work"))));
+        r.caseSensitive = true;
+        r.compile();
+        QVERIFY(!RuleEngine::matches(r, QUrl(QStringLiteral("https://example.com/work"))));
+        QVERIFY(RuleEngine::matches(r, QUrl(QStringLiteral("https://EXAMPLE.com/Work/page"))));
+        r.matchKind = MatchKind::Regex;
+        r.pattern = QStringLiteral("/Work$");
+        r.compile();
+        QVERIFY(!RuleEngine::matches(r, QUrl(QStringLiteral("https://example.com/work"))));
+        QVERIFY(RuleEngine::matches(r, QUrl(QStringLiteral("https://example.com/Work"))));
+    }
+
+    void anUncompiledRegexRuleMatchesNothing()
+    {
+        // Matching reads the compiled expression only, and an empty one would
+        // otherwise match every URL there is.
+        Rule r;
+        r.matchKind = MatchKind::Regex;
+        r.pattern = QStringLiteral("^https://example\\.com/");
+        QVERIFY(!RuleEngine::matches(r, QUrl(QStringLiteral("https://example.com/x"))));
+        r.compile();
+        QVERIFY(RuleEngine::matches(r, QUrl(QStringLiteral("https://example.com/x"))));
     }
 };
 

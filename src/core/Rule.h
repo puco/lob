@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QString>
+#include <QJsonObject>
+#include <QRegularExpression>
 
 namespace Lob
 {
@@ -9,7 +11,7 @@ enum class MatchKind {
     Host,       ///< exact host match
     HostSuffix, ///< host is, or ends in, the pattern ("*.corp.example")
     PathPrefix, ///< host matches and the path starts with the pattern
-    Regex,      ///< anchored match against the whole URL
+    Regex,      ///< regular expression against the URL; add anchors to require a whole-URL match
 };
 
 enum class RuleAction {
@@ -30,6 +32,25 @@ struct Rule {
     /// Explicit rules always win over these, so a deliberate rule is never
     /// shadowed by a choice made in passing.
     bool remembered = false;
+    bool caseSensitive = false; // v1 keeps its historical default
+    int targetVersion = 1; // 2 distinguishes an intentional browser-default memory from a legacy profile ID
+    QJsonObject extensions; // retain fields written by external editors
+
+    /// Compiled form of a Regex pattern. Matching uses this and nothing else,
+    /// so whoever builds a Rule compiles it: RuleStore does that when it reads
+    /// the file, and anything constructing a Rule by hand must call compile().
+    QRegularExpression expression;
+
+    void compile()
+    {
+        if (matchKind != MatchKind::Regex) {
+            expression = {};
+            return;
+        }
+        expression = QRegularExpression(pattern,
+            caseSensitive ? QRegularExpression::NoPatternOption : QRegularExpression::CaseInsensitiveOption);
+        expression.optimize();
+    }
 };
 
 struct Decision {
@@ -44,13 +65,14 @@ struct Decision {
     QString targetId;
     bool privateWindow = false;
     RuleAction action = RuleAction::Ask;
+    bool legacyTarget = false;
 
     /// Index into the rule list that produced this, or -1. For --explain.
     int ruleIndex = -1;
 
     bool opensWithoutAsking() const
     {
-        return source == Source::Rule || source == Source::Memory || source == Source::Fallback;
+        return action != RuleAction::Ask && (source == Source::Rule || source == Source::Memory || source == Source::Fallback);
     }
 };
 

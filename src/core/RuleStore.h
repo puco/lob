@@ -5,6 +5,8 @@
 #include <QList>
 #include <QObject>
 #include <QString>
+#include <QJsonObject>
+#include <QTimer>
 
 class QFileSystemWatcher;
 
@@ -27,40 +29,45 @@ public:
 
     static QString filePath();
 
-    void load();
+    bool load();
     bool save();
+    QString lastError() const;
 
     const QList<Rule> &rules() const;
-    void setRules(const QList<Rule> &rules);
+    bool setRules(const QList<Rule> &rules);
 
     /// Records "always send this host here", replacing any previous memory for
     /// the same host so repeated choices do not pile up.
-    void remember(const QString &host, const QString &targetId, bool privateWindow);
-    void forget(const QString &host);
+    bool remember(const QString &host, const QString &targetId, bool privateWindow);
+    bool forget(const QString &host);
     bool hasMemory(const QString &host) const;
 
     QString fallbackTargetId() const;
-    void setFallbackTargetId(const QString &targetId);
+    bool setFallbackTargetId(const QString &targetId);
 
     /// Milliseconds the hold bar stays up before an automatic choice proceeds.
     int holdMs() const;
-    void setHoldMs(int ms);
+    bool setHoldMs(int ms);
 
     bool stripTracking() const;
-    void setStripTracking(bool strip);
+    bool setStripTracking(bool strip);
 
     /// Parameter patterns to strip; "*" suffix matches by prefix.
     QStringList trackingParameters() const;
 
     /// Ids of "other handler" targets the user has explicitly enabled.
     QStringList enabledOtherHandlers() const;
-    void setOtherHandlerEnabled(const QString &targetId, bool enabled);
+    bool setOtherHandlerEnabled(const QString &targetId, bool enabled);
 
 Q_SIGNALS:
     void changed();
+    void errorOccurred(const QString &message);
 
 private:
     void watchFile();
+    bool writeRoot(const QJsonObject &root);
+    bool fail(const QString &message);
+    void apply(const QJsonObject &root, const QList<Rule> &rules);
 
     QList<Rule> m_rules;
     QString m_fallbackTargetId;
@@ -69,7 +76,12 @@ private:
     QStringList m_trackingParameters;
     QStringList m_enabledOtherHandlers;
     QFileSystemWatcher *m_watcher;
-    bool m_writing = false;
+    QTimer m_reloadTimer;
+    QJsonObject m_root;
+    QByteArray m_snapshot;
+    bool m_hasFile = false;
+    bool m_writable = true;
+    QString m_error;
 };
 
 } // namespace Lob
