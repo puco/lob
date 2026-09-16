@@ -15,8 +15,9 @@ QString writeFile(const QTemporaryDir &dir, const QString &name, const QByteArra
     const QString path = dir.filePath(name);
     QDir().mkpath(QFileInfo(path).absolutePath());
     QFile file(path);
-    file.open(QIODevice::WriteOnly);
-    file.write(content);
+    if (!file.open(QIODevice::WriteOnly) || file.write(content) != content.size()) {
+        qFatal("Could not write browser profile fixture");
+    }
     file.close();
     return path;
 }
