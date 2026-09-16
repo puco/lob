@@ -263,7 +263,7 @@ QStringList chromiumDataDirCandidates(const QString &execBasename, const QString
     QStringList candidates;
     const QString relative = known.value(execBasename);
     if (!relative.isEmpty()) {
-        candidates << homeDir() + QLatin1String("/.config/") + relative;
+        candidates << QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QLatin1Char('/') + relative;
     }
 
     const QString appId = QString(storageId).remove(QLatin1String(".desktop"));
