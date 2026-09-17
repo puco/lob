@@ -88,8 +88,23 @@ bool validate(const QJsonObject &root, QList<Rule> &rules, QString &error)
         }
         const int match = matchNames.indexOf(obj.value(QStringLiteral("match")).toString(QStringLiteral("host")));
         const int action = actionNames.indexOf(obj.value(QStringLiteral("action")).toString(QStringLiteral("open")));
-        if (match < 0 || action < 0 || obj.value(QStringLiteral("pattern")).toString().trimmed().isEmpty()) {
+        const QString pattern = obj.value(QStringLiteral("pattern")).toString().trimmed();
+        if (match < 0 || action < 0 || pattern.isEmpty()) {
             return bad(location + QStringLiteral(" (match, action or pattern)"));
+        }
+        // A pathPrefix pattern carries host and path in one string, and the
+        // engine can do nothing with one that has no host or no path: it
+        // matches nothing, without ever saying so. Someone who wrote
+        // "github.com" meant a host rule, and finding that out now beats
+        // wondering later why the rule never fires.
+        if (match == static_cast<int>(MatchKind::PathPrefix)) {
+            const int slash = pattern.indexOf(QLatin1Char('/'));
+            if (slash < 0) {
+                return bad(location + QStringLiteral(".pattern (pathPrefix needs a path: \"host/path\", or use match \"host\")"));
+            }
+            if (slash == 0) {
+                return bad(location + QStringLiteral(".pattern (pathPrefix needs a host before the path)"));
+            }
         }
         for (const auto &key : {QStringLiteral("private"), QStringLiteral("enabled"), QStringLiteral("remembered"), QStringLiteral("caseSensitive")}) {
             if (obj.contains(key) && !obj.value(key).isBool()) {
