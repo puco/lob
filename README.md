@@ -100,6 +100,12 @@ added or removed; a plain desktop ID selects the browser's own default. Old
 remembered desktop IDs are upgraded only when a single profile makes the
 intended choice unambiguous; otherwise Lob asks again.
 
+The picker never lists a browser and a profile that would do the same thing.
+One profile shows as the browser ("Firefox"); several show as the profiles
+themselves, since the browser's own entry opens whichever is default anyway.
+Both IDs stay usable in rules either way, and `lob --list` shows every one of
+them, marking those the picker leaves out.
+
 **Pause Routing** uses the configured browser fallback, then the previous
 browser for the URL's scheme. If neither is available, it shows the picker.
 

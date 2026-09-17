@@ -126,9 +126,29 @@ private Q_SLOTS:
         // Still resolvable, so a rule naming the profile keeps working.
         QVERIFY(!TargetRegistry::resolve(targets, service->storageId() + QStringLiteral("#Default")).id.isEmpty());
 
+        // With more than one profile the browser's own row is the vague one:
+        // it opens the default profile, which now has a row that says so.
         write(state, "{\"profile\":{\"info_cache\":{\"Default\":{},\"Profile 1\":{}}}}");
         targets = TargetRegistry::fromServices({service}, {});
-        QCOMPARE(TargetRegistry::withoutRedundantProfiles(targets).size(), 3);
+        listed = TargetRegistry::withoutRedundantProfiles(targets);
+        QCOMPARE(targets.size(), 3);
+        QCOMPARE(listed.size(), 2);
+        QVERIFY(std::none_of(listed.cbegin(), listed.cend(), [&](const Target &t) { return t.profileKey.isEmpty(); }));
+        QVERIFY(!TargetRegistry::resolve(targets, service->storageId()).id.isEmpty());
+    }
+
+    void severalProfilesWithNoDefaultKeepTheBrowsersOwnEntry()
+    {
+        // Nothing here says which profile the bare entry would open, so leaving
+        // it out would drop a destination rather than a duplicate name.
+        write(home.filePath(QStringLiteral("config/mozilla/firefox/profiles.ini")),
+              "[Profile0]\nName=one\nPath=one\nIsRelative=1\n"
+              "[Profile1]\nName=two\nPath=two\nIsRelative=1\n");
+        auto service = desktop(QStringLiteral("firefox"), QStringLiteral("/usr/bin/firefox %u"));
+        const auto targets = TargetRegistry::fromServices({service}, {});
+        const auto listed = TargetRegistry::withoutRedundantProfiles(targets);
+        QCOMPARE(targets.size(), 3);
+        QCOMPARE(listed.size(), 3);
     }
 
     void legacyMemoriesAreResolvedOnlyWhenUnambiguous()

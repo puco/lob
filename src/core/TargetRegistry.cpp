@@ -9,7 +9,7 @@
 #include <KShell>
 
 #include <QFileInfo>
-#include <QSet>
+#include <QHash>
 #include <QStandardPaths>
 #include <QDir>
 
@@ -263,27 +263,45 @@ Target TargetRegistry::resolve(const QList<Target> &targets, const QString &id, 
 
 QList<Target> TargetRegistry::withoutRedundantProfiles(const QList<Target> &targets)
 {
-    // A browser with exactly one profile is just the browser: listing both
-    // "Firefox" and "Firefox — default" is two names for the same click. The
-    // profile-qualified target stays in the registry, so a rule or memory
-    // written against either id still resolves -- it is only left out of the
-    // list a person has to read.
-    QHash<QString, int> profiles;
-    QSet<QString> browserDefaults;
+    // The browser's own entry opens whichever profile that browser defaults to,
+    // so it and that profile are two names for the same click. Which of the two
+    // to leave out depends on which name says more:
+    //
+    //   - one profile: the browser's name is the better label, so the profile
+    //     row goes ("Firefox", not "Firefox — default").
+    //   - several: the explicit rows say which profile they open and the bare
+    //     row does not, so the bare row goes.
+    //   - several, none of them marked default: nothing is dropped, because
+    //     which profile the bare row would open is genuinely unknown.
+    //
+    // Both ids stay resolvable throughout. This decides what is listed, never
+    // what a rule or a memory can name.
+    struct Browser {
+        int profiles = 0;
+        bool hasOwnEntry = false;
+        bool knowsDefaultProfile = false;
+    };
+
+    QHash<QString, Browser> browsers;
     for (const auto &target : targets) {
+        Browser &browser = browsers[target.storageId];
         if (target.profileKey.isEmpty()) {
-            browserDefaults.insert(target.storageId);
-        } else {
-            ++profiles[target.storageId];
+            browser.hasOwnEntry = true;
+            continue;
         }
+        ++browser.profiles;
+        browser.knowsDefaultProfile = browser.knowsDefaultProfile || target.isDefaultProfile;
     }
 
     QList<Target> listed;
     listed.reserve(targets.size());
-    std::copy_if(targets.cbegin(), targets.cend(), std::back_inserter(listed), [&](const Target &target) {
-        const bool duplicatesTheBrowser = !target.profileKey.isEmpty()
-            && profiles.value(target.storageId) == 1 && browserDefaults.contains(target.storageId);
-        return !duplicatesTheBrowser;
+    std::copy_if(targets.cbegin(), targets.cend(), std::back_inserter(listed), [&browsers](const Target &target) {
+        const Browser browser = browsers.value(target.storageId);
+        if (!browser.hasOwnEntry || browser.profiles == 0) {
+            return true;
+        }
+        return target.profileKey.isEmpty() ? browser.profiles == 1 || !browser.knowsDefaultProfile
+                                           : browser.profiles > 1;
     });
     return listed;
 }

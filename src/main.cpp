@@ -62,13 +62,26 @@ int runList()
     // would say the same thing twice, and saying so here keeps the two views
     // from looking like a disagreement.
     const auto listed = Lob::TargetRegistry::withoutRedundantProfiles(targets);
+    const auto standsInFor = [&listed](const Lob::Target &hidden) {
+        for (const Lob::Target &target : listed) {
+            if (target.storageId != hidden.storageId) {
+                continue;
+            }
+            // A hidden browser entry is covered by its default profile; a
+            // hidden profile by the browser entry that opens it.
+            if (hidden.profileKey.isEmpty() ? target.isDefaultProfile : target.profileKey.isEmpty()) {
+                return target.id;
+            }
+        }
+        return QString();
+    };
 
     for (const Lob::Target &target : targets) {
         const bool browser = target.kind == Lob::TargetKind::Browser;
         out << (browser ? "[browser] " : "[other]   ") << target.label << '\n';
         out << "    id:      " << target.id << '\n';
         if (!listed.contains(target)) {
-            out << "    listed:  no -- the browser's only profile, reachable as " << target.storageId << '\n';
+            out << "    listed:  no -- same as " << standsInFor(target) << '\n';
         }
         out << "    exec:    " << target.execPath << '\n';
         out << "    engine:  " << familyName(target.family) << '\n';
