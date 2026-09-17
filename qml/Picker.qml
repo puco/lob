@@ -331,7 +331,7 @@ Window {
                 QQC2.Label {
                     visible: picker.filter.length > 0
                     opacity: 0.7
-                    text: i18np("%1 of %2", "%1 of %2", picker.targets.count, picker.unfilteredCount)
+                    text: i18nc("matching targets of total", "%1 of %2", picker.targets.count, picker.unfilteredCount)
                 }
             }
             //

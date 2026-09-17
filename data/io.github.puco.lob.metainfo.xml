@@ -6,6 +6,9 @@
 
   <name>Lob</name>
   <summary>Choose which browser opens each link</summary>
+  <summary xml:lang="de">Auswählen, welcher Browser welchen Link öffnet</summary>
+  <summary xml:lang="fr">Choisir quel navigateur ouvre chaque lien</summary>
+  <summary xml:lang="it">Scegli quale browser apre ciascun collegamento</summary>
 
   <developer id="io.github.puco">
     <name>puco</name>
@@ -26,6 +29,54 @@
     <p>
       Lob handles http and https only. It does not claim mail links, local
       files or PDFs.
+    </p>
+    <p xml:lang="de">
+      Lob registriert sich als Systemzuordnung für http- und https-Links und
+      entscheidet für jeden einzeln, wohin er gehen soll, statt alles an einen
+      einzigen Standardbrowser zu schicken.
+    </p>
+    <p xml:lang="de">
+      Links, auf die eine Regel zutrifft, werden sofort geöffnet – nach einem
+      kurzen Balken, der sich unterbrechen lässt, um etwas anderes zu wählen.
+      Alles Unbekannte zeigt eine tastaturbediente Auswahl der installierten
+      Browser und ihrer Profile, mit der Möglichkeit, die Wahl für diesen Host
+      zu merken.
+    </p>
+    <p xml:lang="de">
+      Lob verarbeitet ausschließlich http und https. E-Mail-Links, lokale
+      Dateien und PDFs beansprucht es nicht.
+    </p>
+    <p xml:lang="fr">
+      Lob s'enregistre comme gestionnaire système des liens http et https et
+      décide pour chacun où il doit aller, au lieu de tout envoyer vers un
+      unique navigateur par défaut.
+    </p>
+    <p xml:lang="fr">
+      Les liens correspondant à une règle s'ouvrent immédiatement, après une
+      brève barre que l'on peut interrompre pour choisir autre chose. Tout ce
+      qui n'est pas reconnu affiche un sélecteur pilotable au clavier listant
+      les navigateurs installés et leurs profils, avec la possibilité de
+      mémoriser le choix pour cet hôte.
+    </p>
+    <p xml:lang="fr">
+      Lob ne traite que http et https. Il ne revendique ni les liens de
+      courriel, ni les fichiers locaux, ni les PDF.
+    </p>
+    <p xml:lang="it">
+      Lob si registra come gestore di sistema per i collegamenti http e https e
+      decide per ciascuno dove debba andare, invece di inviare tutto a un unico
+      browser predefinito.
+    </p>
+    <p xml:lang="it">
+      I collegamenti che corrispondono a una regola si aprono subito, dopo una
+      breve barra che si può interrompere per scegliere altro. Tutto ciò che
+      non viene riconosciuto mostra un selettore utilizzabile da tastiera con
+      l'elenco dei browser installati e dei loro profili, con la possibilità di
+      memorizzare la scelta per quell'host.
+    </p>
+    <p xml:lang="it">
+      Lob gestisce soltanto http e https. Non rivendica i collegamenti di
+      posta, i file locali o i PDF.
     </p>
   </description>
 

@@ -342,18 +342,30 @@ routing a link to one is useful is your call.
 
 ## Translations
 
-Every string in Lob is translatable and the catalogues are wired up, but no
-language ships yet -- English is what you get until someone writes one.
+German, Italian and French ship, alongside English. **None of the three has
+been reviewed by a native speaker** -- they were produced with machine
+assistance, and each catalogue says so in its own header rather than claiming an
+author. Most of this interface is terms of art, which is exactly where that goes
+subtly wrong, so corrections are welcome and expected: if something reads oddly
+in your language, it probably is odd.
+
+To add another:
 
 ```bash
 ./Messages.sh                                          # refresh po/lob.pot
-msginit --input=po/lob.pot --locale=de --output=po/de/lob.po
+msginit --input=po/lob.pot --locale=es --output=po/es/lob.po
 ```
 
 Translate that file and build as usual; the catalogue is compiled and installed
-automatically, and covers the QML picker as well as the C++ side. See
-[po/README.md](po/README.md). CI checks that `po/lob.pot` still matches the
-sources, so a string added without re-running `Messages.sh` fails the build.
+automatically, and covers the QML picker as well as the C++ side. Nothing in the
+packaging needs changing for a new language. See [po/README.md](po/README.md).
+
+CI checks that `po/lob.pot` still matches the sources, so a string added without
+re-running `Messages.sh` fails the build, and runs `msgfmt --check-format` over
+every catalogue, so a translation that drops a `%1` fails it too.
+
+The desktop entry and the AppStream metadata carry their own translations, in
+`data/`, because neither goes through the catalogue.
 
 ## Licence
 
