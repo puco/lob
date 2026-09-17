@@ -10,6 +10,19 @@ everything to one default browser.
 - `http` and `https` only. Not mail links, not local files, not PDFs. URLs
   carrying credentials (`https://user:pw@host/`) are refused outright.
 
+![The picker, listing Chromium and two Firefox profiles](screenshots/picker.png)
+
+A link clicked in Slack arrives wrapped in a redirector. Lob reads through it
+first, so the picker asks about the page rather than about `slack.com` -- and
+"remember for this host" records the destination:
+
+![The picker showing docs.kde.org, with a "via slack-redir.net" line](screenshots/via.png)
+
+When a rule already knows the answer, it says so and gets on with it. Any key
+catches the decision before it goes:
+
+![The hold bar reading "Opening in Firefox -- matched a rule"](screenshots/hold.png)
+
 ## Install
 
 ### Arch
