@@ -23,6 +23,13 @@ keywords=(
 common=(
     --from-code=UTF-8
     --add-comments=i18n
+    # File names, not line numbers. With line numbers the template changes
+    # whenever anything shifts a line in a file that contains a string, so a
+    # commit touching unrelated code fails the CI drift check and has to
+    # regenerate this file to appease it. That trains people to regenerate
+    # without reading, which is the opposite of what the check is for. The file
+    # name is what a translator actually needs to find the context.
+    --add-location=file
     --package-name=lob
     --copyright-holder="Lob contributors"
     --msgid-bugs-address="https://github.com/puco/lob/issues"
