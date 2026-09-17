@@ -1,4 +1,5 @@
 #include "RuleStore.h"
+#include "RuleEngine.h"
 #include "UrlSanitizer.h"
 
 #include <KLocalizedString>
@@ -7,6 +8,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
+#include <QHostAddress>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLockFile>
@@ -330,34 +332,177 @@ bool RuleStore::setRules(const QList<Rule> &rules)
     return writeRoot(root);
 }
 
-bool RuleStore::remember(const QString &host, const QString &targetId, bool privateWindow)
+namespace
 {
-    if (host.isEmpty() || targetId.isEmpty()) {
+
+MatchKind kindFor(MemoryScope scope)
+{
+    switch (scope) {
+    case MemoryScope::Domain:
+        return MatchKind::HostSuffix;
+    case MemoryScope::Path:
+        return MatchKind::PathPrefix;
+    case MemoryScope::Host:
+    case MemoryScope::None:
+        break;
+    }
+    return MatchKind::Host;
+}
+
+/// Lower is narrower. Memories are matched in file order, so this decides
+/// where a new one is written rather than being consulted at match time.
+int specificity(MatchKind kind)
+{
+    switch (kind) {
+    case MatchKind::PathPrefix:
+        return 0;
+    case MatchKind::Host:
+        return 1;
+    case MatchKind::HostSuffix:
+        return 2;
+    case MatchKind::Regex:
+        break;
+    }
+    return 3; // nothing the picker writes; sorts last and stays where it is
+}
+
+/**
+ * Whether a two-label domain is really a public suffix people register under,
+ * such as "co.uk" or "com.au", rather than a domain someone owns.
+ *
+ * Deliberately narrow: a two-letter final label is a country code, and the
+ * handful of second-level labels below are the ones registries actually use.
+ * This misses a country's local invention and it always will -- the full list
+ * is a data file that needs updating, which is not something to smuggle into a
+ * link router. Being wrong here costs an offered scope, never a wrong route:
+ * the pattern is shown before it is written, and the host scope is unaffected.
+ */
+bool isPublicSuffixShape(const QString &domain)
+{
+    static const QStringList registryLabels = {
+        QStringLiteral("co"),  QStringLiteral("com"), QStringLiteral("net"),
+        QStringLiteral("org"), QStringLiteral("ac"),  QStringLiteral("gov"),
+        QStringLiteral("edu"), QStringLiteral("or"),  QStringLiteral("ne"),
+        QStringLiteral("gr"),
+    };
+    const QStringList labels = domain.split(QLatin1Char('.'), Qt::SkipEmptyParts);
+    return labels.size() == 2 && labels.at(1).size() == 2 && registryLabels.contains(labels.at(0));
+}
+
+} // namespace
+
+QString RuleStore::patternFor(MemoryScope scope, const QUrl &url)
+{
+    const QString host = url.host().toLower();
+    if (host.isEmpty()) {
+        return {};
+    }
+
+    switch (scope) {
+    case MemoryScope::None:
+        return {};
+
+    case MemoryScope::Host:
+        return host;
+
+    case MemoryScope::Domain: {
+        // Qt 6 removed QUrl::topLevelDomain() and neither Qt nor KF6 exposes
+        // the public suffix list any more, so this is a rule rather than a
+        // lookup. The rule has to be conservative in one direction above all:
+        // offering "co.uk" as a domain to route would be a memory that
+        // swallows the whole internet, and a user who accepted it once would
+        // have no idea why every link went the same place.
+        if (QHostAddress(host).isNull() == false) {
+            return {}; // an IP address has no domain to widen to
+        }
+        const QStringList labels = host.split(QLatin1Char('.'), Qt::SkipEmptyParts);
+        if (labels.size() < 3) {
+            // Either already a bare domain, or a single name like "localhost".
+            // Both are what the host scope is for.
+            return {};
+        }
+
+        QString domain = labels.mid(labels.size() - 2).join(QLatin1Char('.'));
+        if (isPublicSuffixShape(domain)) {
+            // "bbc.co.uk", not "co.uk". One label further is the real domain,
+            // and if that is the whole host then the host scope already says
+            // it.
+            domain = labels.mid(labels.size() - 3).join(QLatin1Char('.'));
+        }
+
+        // Already the whole domain: offering it would be the host scope under
+        // a second name, and two options that do the same thing read as a bug.
+        return domain == host ? QString() : domain;
+    }
+
+    case MemoryScope::Path: {
+        // The first segment is where the useful boundary sits --
+        // github.com/anthropics, not one memory per repository.
+        const QStringList segments = url.path().split(QLatin1Char('/'), Qt::SkipEmptyParts);
+        if (segments.isEmpty()) {
+            return {};
+        }
+        return host + QLatin1Char('/') + segments.first();
+    }
+    }
+    return {};
+}
+
+bool RuleStore::remember(MemoryScope scope, const QUrl &url, const QString &targetId, bool privateWindow)
+{
+    const QString pattern = patternFor(scope, url);
+    if (pattern.isEmpty() || targetId.isEmpty()) {
         return false;
     }
+
+    const MatchKind kind = kindFor(scope);
     auto rules = m_rules;
-    rules.removeIf([&host](const Rule &r) { return r.remembered && r.matchKind == MatchKind::Host && r.pattern.compare(host, Qt::CaseInsensitive) == 0; });
+    rules.removeIf([&](const Rule &r) {
+        return r.remembered && r.matchKind == kind && r.pattern.compare(pattern, Qt::CaseInsensitive) == 0;
+    });
+
     Rule rule;
-    rule.pattern = host;
+    rule.matchKind = kind;
+    rule.pattern = pattern;
     rule.targetId = targetId;
     rule.privateWindow = privateWindow;
     rule.remembered = true;
     rule.targetVersion = 2;
-    rules.append(rule);
+
+    // Memories are matched in the order they sit in the file, so a broader one
+    // written later would swallow a narrower one written earlier: answering
+    // "everything under kde.org" would override the answer already given for
+    // docs.kde.org. Narrower memories are written ahead of broader ones, which
+    // keeps file order and match order the same thing.
+    int at = rules.size();
+    for (int i = 0; i < rules.size(); ++i) {
+        if (rules.at(i).remembered && specificity(rules.at(i).matchKind) > specificity(kind)) {
+            at = i;
+            break;
+        }
+    }
+    rules.insert(at, rule);
     return setRules(rules);
 }
 
-bool RuleStore::forget(const QString &host)
+int RuleStore::memoryIndexFor(const QUrl &url) const
 {
-    auto rules = m_rules;
-    rules.removeIf([&host](const Rule &r) { return r.remembered && r.matchKind == MatchKind::Host && r.pattern.compare(host, Qt::CaseInsensitive) == 0; });
-    return setRules(rules);
+    for (int i = 0; i < m_rules.size(); ++i) {
+        if (m_rules.at(i).remembered && RuleEngine::matches(m_rules.at(i), url)) {
+            return i;
+        }
+    }
+    return -1;
 }
-bool RuleStore::hasMemory(const QString &host) const
+
+bool RuleStore::forgetAt(int index)
 {
-    return std::any_of(m_rules.cbegin(), m_rules.cend(), [&host](const Rule &r) {
-        return r.remembered && r.matchKind == MatchKind::Host && r.pattern.compare(host, Qt::CaseInsensitive) == 0;
-    });
+    if (index < 0 || index >= m_rules.size() || !m_rules.at(index).remembered) {
+        return false;
+    }
+    auto rules = m_rules;
+    rules.removeAt(index);
+    return setRules(rules);
 }
 
 QString RuleStore::fallbackTargetId() const { return m_fallbackTargetId; }

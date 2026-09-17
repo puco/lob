@@ -89,15 +89,15 @@ private Q_SLOTS:
         populate(picker);
         QSignalSpy finished(&picker, &PickerController::finished);
         picker.showPicker(Link::plain(url), {});
-        picker.choose(0, false, true);
-        picker.choose(0, false, true);
+        picker.choose(0, false, int(MemoryScope::Host));
+        picker.choose(0, false, int(MemoryScope::Host));
         QCOMPARE(launcher.callbacks.size(), 1);
-        QVERIFY(!store.hasMemory(url.host()));
+        QCOMPARE(store.memoryIndexFor(url), -1);
         QCOMPARE(finished.count(), 0);
         launcher.callbacks[0]({});
         launcher.callbacks[0]({});
         QCOMPARE(finished.count(), 1);
-        QVERIFY(store.hasMemory(url.host()));
+        QVERIFY(store.memoryIndexFor(url) >= 0);
     }
 
     void failureKeepsUrlForRetry()
@@ -108,14 +108,14 @@ private Q_SLOTS:
         populate(picker);
         QSignalSpy finished(&picker, &PickerController::finished);
         picker.showPicker(Link::plain(url), {});
-        picker.choose(0, false, true);
+        picker.choose(0, false, int(MemoryScope::Host));
         launcher.callbacks[0]({LaunchResult::Failed, QStringLiteral("failed")});
         QCOMPARE(picker.mode(), PickerController::Mode::Picker);
         QCOMPARE(picker.url(), url.toString());
         QVERIFY(!picker.errorMessage().isEmpty());
-        QVERIFY(!store.hasMemory(url.host()));
+        QCOMPARE(store.memoryIndexFor(url), -1);
         QCOMPARE(finished.count(), 0);
-        picker.choose(0, false, false);
+        picker.choose(0, false, int(MemoryScope::None));
         launcher.callbacks[0]({}); // a late completion from the failed attempt
         QCOMPARE(finished.count(), 0);
         launcher.callbacks[1]({});
@@ -130,7 +130,7 @@ private Q_SLOTS:
         populate(picker);
         QSignalSpy finished(&picker, &PickerController::finished);
         picker.showPicker(Link::plain(url), {});
-        picker.choose(0, false, false);
+        picker.choose(0, false, int(MemoryScope::None));
         picker.cancel();
         QVERIFY(launcher.operations[0]->cancelled);
         QCOMPARE(finished.count(), 1);
@@ -138,7 +138,7 @@ private Q_SLOTS:
         launcher.callbacks[0]({LaunchResult::Cancelled, {}});
         QCOMPARE(finished.count(), 1);
         QCOMPARE(picker.mode(), PickerController::Mode::Picker);
-        picker.choose(0, false, false);
+        picker.choose(0, false, int(MemoryScope::None));
         launcher.operations[1]->dispatched = true;
         picker.cancel();
         QCOMPARE(finished.count(), 1);
@@ -165,7 +165,7 @@ private Q_SLOTS:
     {
         RuleStore store;
         QVERIFY(store.setHoldMs(0));
-        QVERIFY(store.remember(url.host(), QStringLiteral("test.desktop"), false));
+        QVERIFY(store.remember(MemoryScope::Host, url, QStringLiteral("test.desktop"), false));
         FakeLauncher launcher;
         PickerController picker(&store, nullptr, &launcher);
         Target base;
@@ -213,7 +213,7 @@ private Q_SLOTS:
         populate(picker);
         QSignalSpy finished(&picker, &PickerController::finished);
         picker.showPicker(Link::plain(url), {});
-        picker.choose(0, false, false);
+        picker.choose(0, false, int(MemoryScope::None));
         launcher.operations[0]->dispatched = true;
         QTest::qWait(60);
         QCOMPARE(picker.mode(), PickerController::Mode::Launching);
@@ -238,12 +238,12 @@ private Q_SLOTS:
         QCOMPARE(picker.displayHost(), QStringLiteral("github.com"));
         QCOMPARE(picker.wrapperHost(), QStringLiteral("eu01.safelinks.protection.outlook.com"));
 
-        picker.choose(0, false, true);
+        picker.choose(0, false, int(MemoryScope::Host));
         QCOMPARE(launcher.urls.size(), 1);
         QCOMPARE(launcher.urls.constFirst(), scanner);
         launcher.callbacks[0]({});
-        QVERIFY(store.hasMemory(QStringLiteral("github.com")));
-        QVERIFY(!store.hasMemory(QStringLiteral("eu01.safelinks.protection.outlook.com")));
+        QVERIFY(store.memoryIndexFor(QUrl(QStringLiteral("https://github.com/kde/plasma"))) >= 0);
+        QCOMPARE(store.memoryIndexFor(QUrl(QStringLiteral("https://eu01.safelinks.protection.outlook.com/x"))), -1);
     }
 
     void aDispatchThatNeverReportsBackIsEventuallyGivenUpOn()
@@ -257,7 +257,7 @@ private Q_SLOTS:
         QSignalSpy finished(&picker, &PickerController::finished);
         QSignalSpy errors(&picker, &PickerController::errorOccurred);
         picker.showPicker(Link::plain(url), {});
-        picker.choose(0, false, false);
+        picker.choose(0, false, int(MemoryScope::None));
         launcher.operations[0]->dispatched = true;
 
         QTRY_COMPARE(finished.count(), 1);

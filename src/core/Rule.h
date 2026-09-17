@@ -14,6 +14,17 @@ enum class MatchKind {
     Regex,      ///< regular expression against the URL; add anchors to require a whole-URL match
 };
 
+/**
+ * What "remember this" was asked to cover. Maps onto the match kinds above:
+ * a memory is an ordinary rule with the remembered flag, not a separate store.
+ */
+enum class MemoryScope {
+    None,   ///< do not remember
+    Host,   ///< exactly this host
+    Domain, ///< this host and everything under its registrable domain
+    Path,   ///< this host and everything under the first path segment
+};
+
 enum class RuleAction {
     Open, ///< open in targetId
     Ask,  ///< always show the picker, even if a later rule would match

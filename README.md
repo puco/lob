@@ -130,7 +130,8 @@ systemctl --user enable --now lob.service
 
 ### In the picker
 
-`1`–`9` pick · `P` private window · `R` remember for this host · `C` copy
+`1`–`9` pick · `P` private window · `R` remember (press again for a wider
+scope) · `C` copy
 instead of opening · `F5` (or `Ctrl+R`) rescan browsers · `Esc` cancel · arrows
 and `Enter` also work.
 
@@ -259,10 +260,31 @@ version 1's case-insensitive behavior; host comparisons are always insensitive.
 Explicit rules always win over remembered ones, wherever they sit in the file,
 so a choice made in passing can never shadow one you wrote deliberately.
 
-`lob --forget <host>` drops a remembered choice, so that host asks again. It
-takes a URL as readily as a host, since a URL is usually what you have to hand.
-`lob --explain` names the command when the decision it reports came from a
-memory rather than from a rule you wrote.
+### What "remember" covers
+
+`R` in the picker remembers the host. Pressing it again widens the scope, and
+the label always names the pattern about to be written rather than describing
+it:
+
+| Scope | Written as | Covers |
+| --- | --- | --- |
+| Host | `docs.kde.org` | that host only |
+| Domain | `kde.org` | the domain and every subdomain |
+| Path | `docs.kde.org/plasma` | that host under that first path segment |
+
+A scope that has nothing to say about the link is not offered: no path scope
+for a URL with no path, no domain scope for an IP address or for a host that is
+already its own domain. A registry suffix is never offered as a domain, so
+`bbc.co.uk` widens to `bbc.co.uk` and never to `co.uk`.
+
+Narrower memories are written ahead of broader ones, so remembering a whole
+domain later never overrides the answer already given for one host inside it.
+
+`lob --forget <host|url>` drops the memory that actually decides that link,
+which is not always the one named after the host — a path memory is what
+answers a link it covers, so that is what goes. When a link is covered by more
+than one, the command says what is still remembered. `lob --explain` names the
+undo command for whichever memory it reports.
 
 ### Other handlers
 

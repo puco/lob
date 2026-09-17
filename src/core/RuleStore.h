@@ -5,6 +5,7 @@
 #include <QList>
 #include <QObject>
 #include <QString>
+#include <QUrl>
 #include <QJsonObject>
 #include <QMap>
 #include <QTimer>
@@ -37,11 +38,22 @@ public:
     const QList<Rule> &rules() const;
     bool setRules(const QList<Rule> &rules);
 
-    /// Records "always send this host here", replacing any previous memory for
-    /// the same host so repeated choices do not pile up.
-    bool remember(const QString &host, const QString &targetId, bool privateWindow);
-    bool forget(const QString &host);
-    bool hasMemory(const QString &host) const;
+    /// The pattern @p scope would record for @p url, or empty when that scope
+    /// has nothing to say about this URL -- Domain for an IP address, Path for
+    /// a URL with no path, Domain for a host that is already its own domain.
+    /// Empty therefore means "do not offer this scope", which is what the
+    /// picker asks it.
+    static QString patternFor(MemoryScope scope, const QUrl &url);
+
+    /// Records "always send this here", replacing any previous memory of the
+    /// same shape so repeated choices do not pile up.
+    bool remember(MemoryScope scope, const QUrl &url, const QString &targetId, bool privateWindow);
+
+    /// Index of the memory that decides @p url, or -1. This is what a memory
+    /// "for" a URL means: whichever one the engine would actually reach, which
+    /// is not always the one whose pattern looks like the host.
+    int memoryIndexFor(const QUrl &url) const;
+    bool forgetAt(int index);
 
     QString fallbackTargetId() const;
     bool setFallbackTargetId(const QString &targetId);

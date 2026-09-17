@@ -74,16 +74,17 @@ private Q_SLOTS:
 
     void rememberingTheSameHostTwiceReplacesRatherThanAccumulates()
     {
+        const QUrl url(QStringLiteral("https://example.com/a"));
         RuleStore store;
-        store.remember(QStringLiteral("example.com"), QStringLiteral("a.desktop"), false);
-        store.remember(QStringLiteral("example.com"), QStringLiteral("b.desktop"), true);
+        store.remember(MemoryScope::Host, url, QStringLiteral("a.desktop"), false);
+        store.remember(MemoryScope::Host, url, QStringLiteral("b.desktop"), true);
 
         QCOMPARE(store.rules().size(), 1);
         QCOMPARE(store.rules().first().targetId, QStringLiteral("b.desktop"));
         QVERIFY(store.rules().first().privateWindow);
         QVERIFY(store.rules().first().remembered);
         QCOMPARE(store.rules().first().targetVersion, 2);
-        QVERIFY(store.hasMemory(QStringLiteral("example.com")));
+        QVERIFY(store.memoryIndexFor(url) >= 0);
     }
 
     void rememberingDoesNotTouchExplicitRulesForTheSameHost()
@@ -95,7 +96,8 @@ private Q_SLOTS:
 
         RuleStore store;
         store.setRules({explicitRule});
-        store.remember(QStringLiteral("example.com"), QStringLiteral("remembered.desktop"), false);
+        store.remember(MemoryScope::Host, QUrl(QStringLiteral("https://example.com/")),
+                       QStringLiteral("remembered.desktop"), false);
 
         QCOMPARE(store.rules().size(), 2);
         QVERIFY(!store.rules().first().remembered);
@@ -104,14 +106,98 @@ private Q_SLOTS:
 
     void forgettingRemovesOnlyTheMemory()
     {
+        const QUrl one(QStringLiteral("https://example.com/"));
+        const QUrl two(QStringLiteral("https://other.example/"));
         RuleStore store;
-        store.remember(QStringLiteral("example.com"), QStringLiteral("a.desktop"), false);
-        store.remember(QStringLiteral("other.example"), QStringLiteral("b.desktop"), false);
+        store.remember(MemoryScope::Host, one, QStringLiteral("a.desktop"), false);
+        store.remember(MemoryScope::Host, two, QStringLiteral("b.desktop"), false);
 
-        store.forget(QStringLiteral("example.com"));
+        QVERIFY(store.forgetAt(store.memoryIndexFor(one)));
         QCOMPARE(store.rules().size(), 1);
-        QVERIFY(!store.hasMemory(QStringLiteral("example.com")));
-        QVERIFY(store.hasMemory(QStringLiteral("other.example")));
+        QCOMPARE(store.memoryIndexFor(one), -1);
+        QVERIFY(store.memoryIndexFor(two) >= 0);
+    }
+
+    void patternForNamesExactlyWhatEachScopeWouldWrite()
+    {
+        const QUrl url(QStringLiteral("https://docs.kde.org/plasma/config?a=1"));
+        QCOMPARE(RuleStore::patternFor(MemoryScope::Host, url), QStringLiteral("docs.kde.org"));
+        QCOMPARE(RuleStore::patternFor(MemoryScope::Domain, url), QStringLiteral("kde.org"));
+        // The first segment, not the whole path: one memory per section, not
+        // one per page.
+        QCOMPARE(RuleStore::patternFor(MemoryScope::Path, url), QStringLiteral("docs.kde.org/plasma"));
+    }
+
+    void scopesWithNothingToSayAreNotOffered()
+    {
+        // A bare domain is already what the host scope writes.
+        QCOMPARE(RuleStore::patternFor(MemoryScope::Domain, QUrl(QStringLiteral("https://kde.org/"))), QString());
+        // A URL with no path has no path to remember.
+        QCOMPARE(RuleStore::patternFor(MemoryScope::Path, QUrl(QStringLiteral("https://kde.org/"))), QString());
+        // An IP address has no domain to widen to, and "1.1" is not one.
+        QCOMPARE(RuleStore::patternFor(MemoryScope::Domain, QUrl(QStringLiteral("https://192.168.1.1/x"))), QString());
+        // A single name is not a domain either.
+        QCOMPARE(RuleStore::patternFor(MemoryScope::Domain, QUrl(QStringLiteral("https://localhost/x"))), QString());
+    }
+
+    void aRegistrySuffixIsNeverOfferedAsADomainToRoute()
+    {
+        // The failure this has to avoid: "co.uk" as a memory would swallow
+        // every British site at once.
+        QCOMPARE(RuleStore::patternFor(MemoryScope::Domain, QUrl(QStringLiteral("https://bbc.co.uk/news"))), QString());
+        QCOMPARE(RuleStore::patternFor(MemoryScope::Domain, QUrl(QStringLiteral("https://www.bbc.co.uk/news"))),
+                 QStringLiteral("bbc.co.uk"));
+    }
+
+    void aNarrowerMemoryIsWrittenAheadOfABroaderOne()
+    {
+        // Memories match in file order, so a domain memory written second must
+        // not end up deciding links the host memory already answered.
+        RuleStore store;
+        store.remember(MemoryScope::Host, QUrl(QStringLiteral("https://docs.kde.org/x")),
+                       QStringLiteral("host.desktop"), false);
+        store.remember(MemoryScope::Domain, QUrl(QStringLiteral("https://docs.kde.org/x")),
+                       QStringLiteral("domain.desktop"), false);
+
+        QCOMPARE(store.rules().size(), 2);
+        const int index = store.memoryIndexFor(QUrl(QStringLiteral("https://docs.kde.org/anything")));
+        QCOMPARE(store.rules().at(index).targetId, QStringLiteral("host.desktop"));
+
+        // The domain memory still answers a sibling the host memory misses.
+        const int sibling = store.memoryIndexFor(QUrl(QStringLiteral("https://api.kde.org/thing")));
+        QCOMPARE(store.rules().at(sibling).targetId, QStringLiteral("domain.desktop"));
+    }
+
+    void aPathMemoryOutranksAHostMemoryWhicheverIsWrittenFirst()
+    {
+        RuleStore store;
+        store.remember(MemoryScope::Host, QUrl(QStringLiteral("https://github.com/anthropics/x")),
+                       QStringLiteral("personal.desktop"), false);
+        store.remember(MemoryScope::Path, QUrl(QStringLiteral("https://github.com/anthropics/x")),
+                       QStringLiteral("work.desktop"), false);
+
+        const int index = store.memoryIndexFor(QUrl(QStringLiteral("https://github.com/anthropics/other")));
+        QCOMPARE(store.rules().at(index).targetId, QStringLiteral("work.desktop"));
+
+        const int elsewhere = store.memoryIndexFor(QUrl(QStringLiteral("https://github.com/someone/else")));
+        QCOMPARE(store.rules().at(elsewhere).targetId, QStringLiteral("personal.desktop"));
+    }
+
+    void forgetAtRefusesAnythingThatIsNotAMemory()
+    {
+        Rule written;
+        written.matchKind = MatchKind::Host;
+        written.pattern = QStringLiteral("example.com");
+        written.targetId = QStringLiteral("explicit.desktop");
+
+        RuleStore store;
+        store.setRules({written});
+        // A rule someone wrote is not a memory, and --forget must never be a
+        // way to delete one.
+        QVERIFY(!store.forgetAt(0));
+        QVERIFY(!store.forgetAt(-1));
+        QVERIFY(!store.forgetAt(99));
+        QCOMPARE(store.rules().size(), 1);
     }
 
     void malformedJsonIsIgnoredRatherThanOverwritten()
@@ -136,11 +222,11 @@ private Q_SLOTS:
     void invalidEditCannotLoseRulesOrBeOverwritten()
     {
         RuleStore store;
-        QVERIFY(store.remember(QStringLiteral("example.com"), QStringLiteral("a.desktop"), false));
+        QVERIFY(store.remember(MemoryScope::Host, QUrl(QStringLiteral("https://example.com/")), QStringLiteral("a.desktop"), false));
         writeConfig("{ invalid");
         QVERIFY(!store.load());
         QCOMPARE(store.rules().size(), 1);
-        QVERIFY(!store.remember(QStringLiteral("other.com"), QStringLiteral("b.desktop"), false));
+        QVERIFY(!store.remember(MemoryScope::Host, QUrl(QStringLiteral("https://other.com/")), QStringLiteral("b.desktop"), false));
         QCOMPARE(store.rules().size(), 1);
         QFile file(RuleStore::filePath());
         QVERIFY(file.open(QIODevice::ReadOnly));
@@ -247,14 +333,14 @@ private Q_SLOTS:
         // read failure would keep the old contents and refuse every later
         // save, so "remember this choice" would quietly stop working.
         RuleStore store;
-        QVERIFY(store.remember(QStringLiteral("a.example"), QStringLiteral("firefox.desktop"), false));
+        QVERIFY(store.remember(MemoryScope::Host, QUrl(QStringLiteral("https://a.example/")), QStringLiteral("firefox.desktop"), false));
         QVERIFY(QFile::remove(RuleStore::filePath()));
 
         QVERIFY(store.load());
         QVERIFY(store.lastError().isEmpty());
         QVERIFY(store.rules().isEmpty());
 
-        QVERIFY(store.remember(QStringLiteral("b.example"), QStringLiteral("firefox.desktop"), false));
+        QVERIFY(store.remember(MemoryScope::Host, QUrl(QStringLiteral("https://b.example/")), QStringLiteral("firefox.desktop"), false));
         QCOMPARE(store.rules().size(), 1);
     }
 
@@ -265,11 +351,11 @@ private Q_SLOTS:
         QLockFile lock(RuleStore::filePath() + QStringLiteral(".lock"));
         QVERIFY(lock.tryLock(0));
         QSignalSpy errors(&store, &RuleStore::errorOccurred);
-        QVERIFY(!store.remember(QStringLiteral("example.com"), QStringLiteral("a.desktop"), false));
+        QVERIFY(!store.remember(MemoryScope::Host, QUrl(QStringLiteral("https://example.com/")), QStringLiteral("a.desktop"), false));
         QVERIFY(store.rules().isEmpty());
         QCOMPARE(errors.count(), 1);
         lock.unlock();
-        QVERIFY(store.remember(QStringLiteral("example.com"), QStringLiteral("a.desktop"), false));
+        QVERIFY(store.remember(MemoryScope::Host, QUrl(QStringLiteral("https://example.com/")), QStringLiteral("a.desktop"), false));
         QCOMPARE(store.rules().size(), 1);
     }
 };
