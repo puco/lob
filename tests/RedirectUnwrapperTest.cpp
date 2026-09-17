@@ -1,5 +1,7 @@
 #include "core/RedirectUnwrapper.h"
 
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QTest>
 
 using namespace Lob;
@@ -12,6 +14,24 @@ QUrl wrapped(const QString &base, const QString &parameter, const QUrl &target)
 {
     return QUrl(base + parameter + QLatin1Char('=')
                 + QString::fromUtf8(QUrl::toPercentEncoding(target.toString())));
+}
+
+/// An unsigned stand-in for a login hint. The signature is never checked, so
+/// only the payload has to be real.
+QString token(const QString &target)
+{
+    const QJsonObject claims{{QStringLiteral("sub"), QStringLiteral("someone@example.com")},
+                             {QStringLiteral("https://slack.com/target_uri"), target}};
+    const QString payload = QString::fromLatin1(
+        QJsonDocument(claims).toJson(QJsonDocument::Compact).toBase64(QByteArray::Base64UrlEncoding
+                                                                     | QByteArray::OmitTrailingEquals));
+    return QStringLiteral("header.") + payload + QStringLiteral(".signature");
+}
+
+QUrl ssoLink(const QUrl &target)
+{
+    return QUrl(QStringLiteral("https://acme.slack.com/openid/connect/login_initiate_redirect?login_hint=")
+                + token(target.toString()));
 }
 } // namespace
 
@@ -66,6 +86,36 @@ private Q_SLOTS:
         const Link link = RedirectUnwrapper::unwrap(outer);
         QCOMPARE(link.destination, kDestination);
         QCOMPARE(link.toOpen, scanner);
+    }
+
+    void anSsoLoginLinkIsRoutedByItsTargetAndStillVisited()
+    {
+        // A workspace with SSO sends links through Slack as the identity
+        // provider. The destination is a claim in the login hint; the URL
+        // itself is what signs the person in, so it is the one that opens.
+        const QUrl sso = ssoLink(kDestination);
+        const Link link = RedirectUnwrapper::unwrap(sso);
+        QCOMPARE(link.destination, kDestination);
+        QCOMPARE(link.toOpen, sso);
+        QCOMPARE(link.wrapper, QStringLiteral("acme.slack.com"));
+    }
+
+    void aLoginHintThatSaysNothingUsableIsLeftAlone()
+    {
+        // No claim, a payload that is not a token at all, and a claim carrying
+        // something unroutable: in every case Lob knows no more than it did.
+        const QStringList hints = {
+            QStringLiteral("header.eyJzdWIiOiJtZUBleGFtcGxlLmNvbSJ9.signature"), // no target claim
+            QStringLiteral("not-a-token"),
+            QStringLiteral("header.bm90IGpzb24.signature"),
+            token(QStringLiteral("file:///etc/passwd")),
+        };
+        for (const QString &hint : hints) {
+            const QUrl url(QStringLiteral("https://acme.slack.com/openid/connect/login_initiate_redirect?login_hint=") + hint);
+            const Link link = RedirectUnwrapper::unwrap(url);
+            QVERIFY2(!link.wasWrapped(), qPrintable(hint.left(20)));
+            QCOMPARE(link.destination, url);
+        }
     }
 
     void onlyTheEndpointThatRedirectsIsTreatedAsOne()

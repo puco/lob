@@ -128,6 +128,13 @@ Instagram, YouTube, LinkedIn, Steam, VK, Tumblr and Outlook SafeLinks. The
 picker shows the destination with a `via <host>` line, so a URL that is not the
 one you clicked is never a surprise.
 
+A workspace with single sign-on is the other shape this takes: Slack sends the
+link through itself as the identity provider, with the destination inside a
+signed login hint rather than in a plain parameter. Lob reads the claim to route
+the link and opens the original, because that URL is what signs you in before
+you land on the page. The hint is short-lived and carries your identity, which
+is one more reason Lob never writes URLs to the log.
+
 Link scanners are the exception to opening what was read. A SafeLinks URL exists
 to be visited — that is where the scan happens — so Lob routes by the
 destination but still hands the browser the scanner's URL. Everything else opens

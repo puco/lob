@@ -2,6 +2,9 @@
 
 #include "UrlSanitizer.h"
 
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonValue>
 #include <QUrlQuery>
 
 namespace Lob
@@ -21,6 +24,7 @@ struct Wrapper {
     QString path;           ///< path prefix, or empty for any path
     QStringList parameters; ///< query parameters to read, in order of preference
     Policy policy = Policy::Rewrite;
+    QString claim;          ///< if set, the parameter holds a JWT and this claim holds the URL
 };
 
 /// Redirectors that state their destination in the URL.
@@ -33,6 +37,15 @@ const QList<Wrapper> &knownWrappers()
     static const QList<Wrapper> wrappers = {
         {QStringLiteral("slack-redir.net"), {}, {QStringLiteral("url")}, Policy::Rewrite},
         {QStringLiteral(".slack.com"), QStringLiteral("/link"), {QStringLiteral("url")}, Policy::Rewrite},
+
+        // A workspace with SSO sends links through Slack as the identity
+        // provider: the destination is a claim inside a signed login hint, and
+        // visiting the URL is what signs the person in before they land there.
+        // KeepIntact for the same reason as a scanner -- and this one has a
+        // lifetime measured in seconds, so there is nothing to be gained by
+        // holding on to it either.
+        {QStringLiteral(".slack.com"), QStringLiteral("/openid/connect/login_initiate_redirect"),
+         {QStringLiteral("login_hint")}, Policy::KeepIntact, QStringLiteral("https://slack.com/target_uri")},
         {QStringLiteral("out.reddit.com"), {}, {QStringLiteral("url")}, Policy::Rewrite},
         {QStringLiteral("l.facebook.com"), {}, {QStringLiteral("u")}, Policy::Rewrite},
         {QStringLiteral("lm.facebook.com"), {}, {QStringLiteral("u")}, Policy::Rewrite},
@@ -94,6 +107,30 @@ const Wrapper *wrapperFor(const QUrl &url, const QList<Wrapper> &wrappers)
     return nullptr;
 }
 
+/// The URL inside a JSON Web Token's claim.
+///
+/// The signature is not checked, and cannot be: verifying it would mean
+/// fetching the issuer's keys, which is a network request made to answer a
+/// question this does not need answered. Nothing is trusted on the strength of
+/// the claim -- it picks which browser opens the link, while the URL handed to
+/// that browser remains the one that arrived, signature and all.
+QUrl claimedUrl(const QString &token, const QString &claim)
+{
+    const QList<QByteArray> parts = token.toLatin1().split('.');
+    if (parts.size() < 2) {
+        return {};
+    }
+
+    const QJsonDocument payload = QJsonDocument::fromJson(
+        QByteArray::fromBase64(parts.at(1), QByteArray::Base64UrlEncoding));
+    if (!payload.isObject()) {
+        return {};
+    }
+
+    const QJsonValue value = payload.object().value(claim);
+    return value.isString() ? QUrl(value.toString(), QUrl::StrictMode) : QUrl();
+}
+
 /// The URL a redirector is carrying, or an empty URL if it is not carrying one.
 QUrl destinationIn(const QUrl &url, const Wrapper &wrapper)
 {
@@ -105,7 +142,8 @@ QUrl destinationIn(const QUrl &url, const Wrapper &wrapper)
         if (value.isEmpty()) {
             continue;
         }
-        const QUrl destination(value, QUrl::StrictMode);
+        const QUrl destination = wrapper.claim.isEmpty() ? QUrl(value, QUrl::StrictMode)
+                                                         : claimedUrl(value, wrapper.claim);
         if (destination.isValid() && !destination.scheme().isEmpty()) {
             return destination;
         }
