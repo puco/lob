@@ -54,6 +54,27 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.2" date="2026-09-17">
+      <description>
+        <p>Links now reach the browser you meant, and say so when they cannot.</p>
+        <ul>
+          <li>A link clicked in Slack, a search result or a mail client is routed by
+          where it actually goes, rather than by the redirector it arrived through.</li>
+          <li>The picker stays up until a launch succeeds or fails, and a choice is
+          remembered only once it has worked.</li>
+          <li>Desktop entries are honoured as written, so Flatpak browsers, wrapped
+          commands and custom profile directories launch correctly.</li>
+          <li>Private windows never silently fall back to ordinary ones.</li>
+          <li>Every browser profile keeps a stable identity, and the picker no longer
+          lists the same browser twice.</li>
+          <li>A malformed or half-finished edit to rules.json leaves the last valid
+          configuration in place instead of dropping every rule.</li>
+          <li>Restoring the previous default browser puts back exactly what was there,
+          including having had no default at all.</li>
+          <li>A URL copied to the clipboard survives the process that copied it.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1" date="2026-09-16">
       <description>
         <p>First working version: browser and profile discovery, a keyboard-driven
