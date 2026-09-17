@@ -154,6 +154,7 @@ private:
     QSharedPointer<LaunchOperation> m_operation;
     int m_currentIndex = 0;
     bool m_launchStalled = false;
+    bool m_usingLayerShell = false;
     QFileSystemWatcher m_targetWatcher;
     QTimer m_refreshTimer;
 };

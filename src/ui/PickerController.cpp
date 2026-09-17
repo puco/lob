@@ -12,6 +12,7 @@
 #include <KSycoca>
 
 #include <QClipboard>
+#include <QCursor>
 #include <QGuiApplication>
 #include <QLoggingCategory>
 #include <QQmlApplicationEngine>
@@ -311,6 +312,8 @@ bool PickerController::ensureWindow(QQmlApplicationEngine *engine)
     const bool noLayerShell = qEnvironmentVariableIsSet("LOB_NO_LAYERSHELL");
     LayerShellQt::Window *layer = noLayerShell ? nullptr : LayerShellQt::Window::get(m_window);
 
+    m_usingLayerShell = layer != nullptr;
+
     if (layer) {
         layer->setLayer(LayerShellQt::Window::LayerOverlay);
         layer->setAnchors({LayerShellQt::Window::AnchorTop | LayerShellQt::Window::AnchorBottom
@@ -404,8 +407,27 @@ void PickerController::present(const QString &activationToken)
         return;
     }
 
-    if (auto *screen = m_window->screen() ? m_window->screen() : QGuiApplication::primaryScreen()) {
-        m_window->setGeometry(screen->geometry());
+    // Under layer-shell the compositor owns both the output and the geometry:
+    // the surface is anchored to all four edges and asks to be on the active
+    // screen, so a geometry set here only fights the configure that follows.
+    //
+    // Without it -- X11, or LOB_NO_LAYERSHELL -- placement is ours, and a
+    // resident daemon's window is still on whichever screen it was last shown
+    // on. On one monitor that is always right and the question never comes up;
+    // on two it is right only by luck. The pointer is the best available guess
+    // at where the link was clicked, and on X11 it is an accurate one.
+    if (!m_usingLayerShell) {
+        QScreen *screen = QGuiApplication::screenAt(QCursor::pos());
+        if (!screen) {
+            screen = m_window->screen();
+        }
+        if (!screen) {
+            screen = QGuiApplication::primaryScreen();
+        }
+        if (screen) {
+            m_window->setScreen(screen);
+            m_window->setGeometry(screen->geometry());
+        }
     }
 
     // Time to the first presented frame is the number that matters: it is what

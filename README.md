@@ -229,6 +229,12 @@ routing a link to one is useful is your call.
 - `LOB_NO_LAYERSHELL=1` runs the picker as an ordinary window instead of a
   layer-shell overlay with an exclusive keyboard grab. Useful when iterating
   on the UI.
+- **Wayland is what Lob is built for and tested on.** X11 has no layer-shell
+  protocol, so the picker falls back to an ordinary always-on-top window: it
+  works, but without the exclusive keyboard grab, which also means the
+  hold-Shift-to-override gesture cannot be observed and is simply absent. That
+  fallback is not covered by the automated tests. It is not disowned either --
+  bug reports are welcome; it is just not a path anything here verifies.
 - If `~/.config/kde-mimeapps.list` sets an http/https default it outranks the
   registration Lob writes; `lob --status` warns when that is the case.
 
