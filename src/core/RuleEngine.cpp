@@ -1,6 +1,7 @@
 #include "RuleEngine.h"
 
-#include <QCoreApplication>
+#include <KLocalizedString>
+
 #include <QRegularExpression>
 
 namespace Lob
@@ -103,38 +104,38 @@ Decision RuleEngine::decide(const QUrl &url, const QList<Rule> &rules, const QSt
 
 QString RuleEngine::describe(const Rule &rule)
 {
-    const auto tr = [](const char *text) {
-        return QCoreApplication::translate("RuleEngine", text);
-    };
-
+    // Built in two halves -- what it matches, then what it does -- because
+    // that is how the rule itself is written. Translators get the halves with
+    // context saying how they are joined, since word order across the join is
+    // not something a fragment can express on its own.
     QString match;
     switch (rule.matchKind) {
     case MatchKind::Host:
-        match = tr("host is %1");
+        match = i18nc("what a rule matches; becomes %1 of a \"<match> -> <action>\" line", "host is %1", rule.pattern);
         break;
     case MatchKind::HostSuffix:
-        match = tr("host is or ends in %1");
+        match = i18nc("what a rule matches; becomes %1 of a \"<match> -> <action>\" line", "host is or ends in %1", rule.pattern);
         break;
     case MatchKind::PathPrefix:
-        match = tr("URL starts with %1");
+        match = i18nc("what a rule matches; becomes %1 of a \"<match> -> <action>\" line", "URL starts with %1", rule.pattern);
         break;
     case MatchKind::Regex:
-        match = tr("URL matches /%1/");
+        match = i18nc("what a rule matches; becomes %1 of a \"<match> -> <action>\" line", "URL matches /%1/", rule.pattern);
         break;
     }
-    match = match.arg(rule.pattern);
 
     switch (rule.action) {
     case RuleAction::Ask:
-        return tr("%1 → always ask").arg(match);
+        return i18nc("%1 is what the rule matches", "%1 → always ask", match);
     case RuleAction::Copy:
-        return tr("%1 → copy instead of opening").arg(match);
+        return i18nc("%1 is what the rule matches", "%1 → copy instead of opening", match);
     case RuleAction::Open:
         break;
     }
 
-    return rule.privateWindow ? tr("%1 → open in %2 (private)").arg(match, rule.targetId)
-                              : tr("%1 → open in %2").arg(match, rule.targetId);
+    return rule.privateWindow
+        ? i18nc("%1 is what the rule matches, %2 a browser or profile id", "%1 → open in %2 (private)", match, rule.targetId)
+        : i18nc("%1 is what the rule matches, %2 a browser or profile id", "%1 → open in %2", match, rule.targetId);
 }
 
 } // namespace Lob
