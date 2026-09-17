@@ -35,6 +35,21 @@
   <url type="bugtracker">https://github.com/puco/lob/issues</url>
   <url type="vcs-browser">https://github.com/puco/lob</url>
 
+  <screenshots>
+    <screenshot type="default">
+      <caption>Choosing a browser, with Firefox profiles listed separately</caption>
+      <image>https://raw.githubusercontent.com/puco/lob/main/screenshots/picker.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>A link from Slack, routed by where it actually goes</caption>
+      <image>https://raw.githubusercontent.com/puco/lob/main/screenshots/via.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>A rule has decided; the bar can be interrupted to choose otherwise</caption>
+      <image>https://raw.githubusercontent.com/puco/lob/main/screenshots/hold.png</image>
+    </screenshot>
+  </screenshots>
+
   <categories>
     <category>Network</category>
     <category>Utility</category>
