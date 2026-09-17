@@ -195,8 +195,10 @@ than overwriting an edit made elsewhere.
 ```
 
 `match` is `host`, `hostSuffix`, `pathPrefix` or `regex`. `hostSuffix` covers
-the bare domain as well as subdomains. `action` is `open`, `ask` or `copy`.
-Target ids come from `lob --list`.
+the bare domain as well as subdomains. `pathPrefix` carries host and path in
+one pattern and needs both, so `github.com` is refused rather than accepted as
+a rule that could never match -- write it as a `host` rule instead. `action` is
+`open`, `ask` or `copy`. Target ids come from `lob --list`.
 
 The file is strict JSON (no comments). `holdMs` is an integer from 0 to 60000;
 zero skips the hold bar. An empty `fallbackTarget` means ask. An omitted

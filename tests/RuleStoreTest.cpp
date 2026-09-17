@@ -184,6 +184,33 @@ private Q_SLOTS:
         }
     }
 
+    void pathPrefixWithoutAPathIsRejectedRatherThanSilentlyDead()
+    {
+        RuleStore store;
+        QVERIFY(store.setHoldMs(1200));
+
+        // The engine splits a pathPrefix pattern at the first slash, so one
+        // without a host or without a path matches nothing at all. Refusing it
+        // is the only way the author ever finds out.
+        for (const auto &pattern : {QByteArray("github.com"), QByteArray("/anthropics"), QByteArray("   ")}) {
+            writeConfig("{\"rules\":[{\"match\":\"pathPrefix\",\"pattern\":\"" + pattern
+                        + "\",\"target\":\"a.desktop\"}]}");
+            QVERIFY2(!store.load(), pattern.constData());
+            QCOMPARE(store.holdMs(), 1200);
+            QVERIFY(store.lastError().contains(QLatin1String("pathPrefix"))
+                    || store.lastError().contains(QLatin1String("pattern")));
+        }
+
+        // "host/" is a host rule written the long way round, not a mistake:
+        // every path starts with "/", which is exactly what it asks for.
+        for (const auto &pattern : {QByteArray("github.com/"), QByteArray("github.com/anthropics")}) {
+            writeConfig("{\"rules\":[{\"match\":\"pathPrefix\",\"pattern\":\"" + pattern
+                        + "\",\"target\":\"a.desktop\"}]}");
+            QVERIFY2(store.load(), pattern.constData());
+            QCOMPARE(store.rules().size(), 1);
+        }
+    }
+
     void watchesCreationReplacementAndRecreation()
     {
         QDir(QFileInfo(RuleStore::filePath()).absolutePath()).removeRecursively();
