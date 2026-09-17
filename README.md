@@ -43,6 +43,29 @@ verified before anything is built.
 > it reopens they will be submitted under those names and this becomes
 > `paru -S lob`.
 
+### Fedora
+
+```bash
+sudo dnf copr enable puco/lob
+sudo dnf install lob
+```
+
+Fedora 43 and later; earlier releases do not carry KDE Frameworks 6.19. The
+spec lives in [packaging/fedora](packaging/fedora) and CI builds it on every
+change, so building it yourself with `rpmbuild` works too.
+
+> **Not on COPR yet.** The spec builds and installs cleanly; publishing it
+> needs a Fedora account, which is tracked in
+> [issue #8](https://github.com/puco/lob/issues/8).
+
+### Other distributions
+
+Build from source. Lob needs KDE Frameworks 6.19+ and layer-shell-qt 6.6+,
+which most stable releases are still behind. There is no Flatpak and probably
+will not be: a sandboxed Lob cannot launch a host browser with the modified
+command line that per-profile routing depends on, so it would quietly lose the
+main reason to use it.
+
 Then start the daemon and claim the link handler:
 
 ```bash

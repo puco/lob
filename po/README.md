@@ -27,6 +27,11 @@ msgmerge --update po/de/lob.po po/lob.pot
 - The template carries no `POT-Creation-Date`. It is dropped deliberately so the
   file changes only when the messages do, which is what makes the CI check
   meaningful rather than noise.
+- The Fedora spec needs two lines added with the *first* translation to land:
+  `%find_lang %{name}` in `%install`, and `-f %{name}.lang` on `%files`. They
+  are left out until then because rpm refuses an empty file list, and a package
+  that fails to build is a worse greeting than a missing line. See
+  [packaging/fedora/lob.spec](../packaging/fedora/lob.spec), which says the same.
 - Strings in `data/*.desktop.in` and `data/*.metainfo.xml` are translated
   through their own mechanisms (`Name[de]=` entries and `xml:lang` attributes)
   rather than through this catalogue.

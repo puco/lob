@@ -83,6 +83,37 @@ jobs:
           chown -R builder .
           su builder -c "bash packaging/check-package.sh '$PWD/lob-$version.tar.gz' '$PWD/packaging/aur/lob/PKGBUILD' '$PWD/package-check'"
 
+  fedora:
+    name: Build the Fedora package
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    # Arch is the reference platform, but it is not the only one Lob claims to
+    # run on any more. A spec that is never built is a spec that is wrong, and
+    # finding that out from a user's dnf is worse than finding it out here.
+
+    steps:
+      - name: Install rpm tooling
+        run: dnf install -y rpm-build rpmdevtools dnf-plugins-core git-core
+
+      - uses: actions/checkout@v4
+
+      - name: Build the RPM from this revision
+        run: |
+          git config --global --add safe.directory "$PWD"
+          version=$(sed -nE 's/^project\(lob VERSION ([0-9.]+).*/\1/p' CMakeLists.txt)
+          rpmdev-setuptree
+          git archive --format=tar.gz --prefix="lob-$version/" \
+              -o ~/rpmbuild/SOURCES/"lob-$version.tar.gz" HEAD
+          cp packaging/fedora/lob.spec ~/rpmbuild/SPECS/
+          dnf builddep -y ~/rpmbuild/SPECS/lob.spec
+          rpmbuild -bb ~/rpmbuild/SPECS/lob.spec
+
+      - name: Show what the package contains
+        # %files drifting out of step with what CMake installs is the failure
+        # this catches -- rpmbuild errors on unpackaged files, but a stale entry
+        # that happens to still exist is only visible by reading the list.
+        run: rpm -qlp ~/rpmbuild/RPMS/*/lob-*.rpm
+
   packaging:
     name: Validate PKGBUILDs
     runs-on: ubuntu-latest
