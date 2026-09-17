@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(lob VERSION 0.3 LANGUAGES CXX)
+project(lob VERSION 0.4 LANGUAGES CXX)
 
 set(QT_MIN_VERSION 6.6.0)
 set(KF_MIN_VERSION 6.19.0)

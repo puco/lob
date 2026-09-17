@@ -120,6 +120,24 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.4" date="2026-09-17">
+      <description>
+        <p>Lob can be configured without a text editor, and speaks three more languages.</p>
+        <ul>
+          <li>A settings window over the rules, the remembered choices, the
+          applications that register for links without being browsers, and the
+          hold duration. Rules are listed in the order they are matched and can
+          be reordered there, because that order decides which one wins.</li>
+          <li>"Remember" can now cover a host, a whole domain, or everything
+          under a path, rather than always the host alone. "lob --forget" drops
+          whichever memory actually decides a link.</li>
+          <li>The picker can be filtered by typing, which it needed once a
+          machine had more browsers and profiles than there are digits.</li>
+          <li>German, Italian and French. None of the three has been reviewed by
+          a native speaker yet, and corrections are welcome.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.3" date="2026-09-17">
       <description>
         <p>Lob looks like itself now, and installs somewhere other than Arch.</p>
