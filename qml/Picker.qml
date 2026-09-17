@@ -8,6 +8,10 @@ Window {
 
     property bool privateMode: false
 
+    // Filtering is a mode because P, R and C are bare letters: there is no
+    // free alphabet to type into while they mean what they mean.
+    property bool filtering: false
+
     // Index into picker.memoryScopes, or -1 for "do not remember". R walks it,
     // so the scopes offered are only ever ones that apply to this URL.
     property int rememberIndex: -1
@@ -42,12 +46,24 @@ Window {
             ? -1 : root.rememberIndex + 1
     }
 
+    // Esc gives back the filter before it gives up the link, so the key never
+    // throws away more than the last thing that was done.
+    function dismiss() {
+        if (root.filtering) {
+            root.filtering = false
+            picker.filter = ""
+        } else {
+            picker.cancel()
+        }
+    }
+
     // Reset per invocation: a stale selection, a lingering private toggle or a
     // leftover "remember" tick from the previous link would all be surprises.
     onVisibleChanged: if (visible) {
         picker.currentIndex = 0
         root.privateMode = false
         root.rememberIndex = -1
+        root.filtering = false
         keyHandler.forceActiveFocus()
     }
 
@@ -108,9 +124,13 @@ Window {
                 return
             }
 
+            // Keys that mean the same thing whether or not a filter is being
+            // typed. The digits are here on purpose: they number the cells on
+            // screen, and a filter that took them away would remove the
+            // fastest way to pick from the list it just narrowed.
             switch (event.key) {
             case Qt.Key_Escape:
-                picker.cancel(); event.accepted = true; return
+                root.dismiss(); event.accepted = true; return
             case Qt.Key_Return:
             case Qt.Key_Enter:
                 root.choose(picker.currentIndex); event.accepted = true; return
@@ -122,22 +142,56 @@ Window {
             case Qt.Key_Up:
                 picker.currentIndex = Math.max(picker.currentIndex - 1, 0)
                 event.accepted = true; return
-            case Qt.Key_P:
-                root.privateMode = !root.privateMode; event.accepted = true; return
-            case Qt.Key_R:
-                // Ctrl+R alongside F5, because that is what every browser does.
-                if (event.modifiers & Qt.ControlModifier) picker.refreshTargets()
-                else root.cycleRemember()
-                event.accepted = true; return
             case Qt.Key_F5:
                 picker.refreshTargets(); event.accepted = true; return
-            case Qt.Key_C:
-                picker.copyUrl(); event.accepted = true; return
             }
 
             if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
                 root.choose(event.key - Qt.Key_1)
                 event.accepted = true
+                return
+            }
+
+            // Ctrl+F and / start filtering; Ctrl+R stays refresh, because that
+            // is what every browser does.
+            if ((event.key === Qt.Key_F && (event.modifiers & Qt.ControlModifier))
+                    || (event.key === Qt.Key_Slash && !root.filtering)) {
+                root.filtering = true
+                event.accepted = true; return
+            }
+            if (event.key === Qt.Key_R && (event.modifiers & Qt.ControlModifier)) {
+                picker.refreshTargets(); event.accepted = true; return
+            }
+
+            if (root.filtering) {
+                // Alt keeps the actions reachable without leaving the filter,
+                // which would otherwise mean retyping it to remember a choice.
+                if (event.modifiers & Qt.AltModifier) {
+                    switch (event.key) {
+                    case Qt.Key_P: root.privateMode = !root.privateMode; event.accepted = true; return
+                    case Qt.Key_R: root.cycleRemember(); event.accepted = true; return
+                    case Qt.Key_C: picker.copyUrl(); event.accepted = true; return
+                    }
+                }
+                if (event.key === Qt.Key_Backspace) {
+                    picker.filter = picker.filter.slice(0, -1)
+                    if (picker.filter === "") root.filtering = false
+                    event.accepted = true; return
+                }
+                if (event.text.length > 0 && event.text.charCodeAt(0) >= 0x20) {
+                    picker.filter += event.text
+                    event.accepted = true; return
+                }
+                return
+            }
+
+            switch (event.key) {
+            case Qt.Key_P:
+                root.privateMode = !root.privateMode; event.accepted = true; return
+            case Qt.Key_R:
+                root.cycleRemember(); event.accepted = true; return
+            case Qt.Key_C:
+                picker.copyUrl(); event.accepted = true; return
             }
         }
 
@@ -247,9 +301,38 @@ Window {
             QQC2.Label {
                 Layout.fillWidth: true
                 visible: !picker.holding && picker.targets.count === 0
-                text: i18n("No browsers found. Install a browser, then refresh the list.")
+                text: picker.unfilteredCount > 0
+                    ? i18n("Nothing matches “%1”.", picker.filter)
+                    : i18n("No browsers found. Install a browser, then refresh the list.")
                 wrapMode: Text.Wrap
                 horizontalAlignment: Text.AlignHCenter
+            }
+
+            // The filter is shown as its own line rather than as a text field:
+            // focus stays on the key handler, which is what keeps the digits
+            // and Esc behaving the same whether or not a filter is being typed.
+            RowLayout {
+                Layout.alignment: Qt.AlignHCenter
+                visible: root.filtering && !picker.holding
+                spacing: Kirigami.Units.smallSpacing
+
+                Kirigami.Icon {
+                    source: "search"
+                    implicitWidth: Kirigami.Units.iconSizes.small
+                    implicitHeight: Kirigami.Units.iconSizes.small
+                }
+
+                QQC2.Label {
+                    text: picker.filter.length > 0 ? picker.filter : i18n("type to filter")
+                    opacity: picker.filter.length > 0 ? 1 : 0.6
+                    font.bold: picker.filter.length > 0
+                }
+
+                QQC2.Label {
+                    visible: picker.filter.length > 0
+                    opacity: 0.7
+                    text: i18np("%1 of %2", "%1 of %2", picker.targets.count, picker.unfilteredCount)
+                }
             }
             //
             // Centred and sized to its contents rather than stretched: a Flow
@@ -383,7 +466,9 @@ Window {
                 font: Kirigami.Theme.smallFont
                 text: picker.holding
                     ? i18n("Any key or click to choose a different browser")
-                    : i18n("1–9 pick · P private · R remember · C copy · F5 refresh · Esc cancel")
+                    : root.filtering
+                        ? i18n("1–9 pick · Alt+P private · Alt+R remember · Alt+C copy · Esc clear filter")
+                        : i18n("1–9 pick · / filter · P private · R remember · C copy · F5 refresh · Esc cancel")
             }
         }
     }

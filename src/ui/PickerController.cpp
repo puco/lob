@@ -209,6 +209,32 @@ void PickerController::setCurrentIndex(int index)
     Q_EMIT selectionChanged();
 }
 
+QString PickerController::filter() const
+{
+    return m_model->filter();
+}
+
+void PickerController::setFilter(const QString &text)
+{
+    if (m_model->filter() == text) {
+        return;
+    }
+    // Keep the highlight on the same target where the filter still shows it,
+    // so narrowing a list does not move the selection out from under a digit
+    // that was about to be pressed.
+    const QString selected = m_model->at(m_currentIndex).id;
+    m_model->setFilter(text);
+
+    const int kept = m_model->indexOfId(selected);
+    setCurrentIndex(m_model->count() == 0 ? -1 : (kept >= 0 ? kept : 0));
+    Q_EMIT filterChanged();
+}
+
+int PickerController::unfilteredCount() const
+{
+    return TargetRegistry::withoutRedundantProfiles(m_targets).size();
+}
+
 void PickerController::refreshTargets()
 {
     if (m_mode == Mode::Launching || m_mode == Mode::Hold) {
@@ -272,14 +298,9 @@ void PickerController::applyTargets(const QList<Target> &targets)
     const QString selected = m_model->at(m_currentIndex).id;
     m_model->setTargets(listed);
 
-    int index = 0;
-    for (int n = 0; n < listed.size(); ++n) {
-        if (listed.at(n).id == selected) {
-            index = n;
-            break;
-        }
-    }
-    setCurrentIndex(listed.isEmpty() ? -1 : index);
+    const int kept = m_model->indexOfId(selected);
+    setCurrentIndex(m_model->count() == 0 ? -1 : (kept >= 0 ? kept : 0));
+    Q_EMIT filterChanged();
 }
 
 void PickerController::watchTargetSources(const QList<Target> &targets)
@@ -423,6 +444,7 @@ void PickerController::begin(const Link &link, const QString &activationToken)
     }
     m_operation.clear();
     m_error.clear();
+    setFilter(QString());
     setCurrentIndex(0);
     m_link = link;
     m_activationToken = activationToken;
