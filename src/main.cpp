@@ -157,8 +157,15 @@ int runExplain(const QString &rawUrl)
         out << "-> remembered #" << decision.ruleIndex << ": "
             << Lob::RuleEngine::describe(rules.at(decision.ruleIndex)) << '\n';
         // A memory is the one kind of rule nobody chose to write down, so it
-        // is the one worth saying how to undo.
-        out << "   undo with: lob --forget " << rules.at(decision.ruleIndex).pattern << '\n';
+        // is the one worth saying how to undo. The pattern itself is not
+        // always a valid argument -- --forget takes a host or a URL, and a
+        // path memory's pattern is neither -- so the hint names the URL that
+        // reaches this memory, which is the thing that was asked about anyway.
+        out << "   undo with: lob --forget "
+            << (rules.at(decision.ruleIndex).matchKind == Lob::MatchKind::PathPrefix
+                    ? routed.toString()
+                    : rules.at(decision.ruleIndex).pattern)
+            << '\n';
         break;
     case Lob::Decision::Source::Fallback:
         out << "-> no match; fallback target " << decision.targetId << '\n';
@@ -202,10 +209,14 @@ int runForget(const QString &argument)
     QTextStream out(stdout);
 
     // People reach for this after clicking something, so the thing on the
-    // clipboard is a URL far more often than a bare host. Both work.
-    const QUrl url = QUrl::fromUserInput(argument);
-    const QString host = url.host().isEmpty() ? argument.trimmed().toLower() : url.host().toLower();
-    if (host.isEmpty()) {
+    // clipboard is a URL far more often than a bare host. Both work: a bare
+    // host becomes the URL it would have been, which is what the memories for
+    // it were written against.
+    QUrl url = QUrl::fromUserInput(argument);
+    if (url.host().isEmpty()) {
+        url = QUrl(QStringLiteral("https://") + argument.trimmed().toLower());
+    }
+    if (url.host().isEmpty()) {
         QTextStream(stderr) << "usage: lob --forget <host|url>\n";
         return 2;
     }
@@ -218,18 +229,30 @@ int runForget(const QString &argument)
         return 1;
     }
 
-    if (!store.hasMemory(host)) {
-        out << "nothing remembered for " << host << '\n';
+    // Whichever memory the engine would actually reach, not whichever one
+    // happens to be named after the host: a memory covering a domain or a path
+    // is the thing deciding these links, and is what has to go.
+    const int index = store.memoryIndexFor(url);
+    if (index < 0) {
+        out << "nothing remembered for " << url.host() << '\n';
         return 0;
     }
 
-    if (!store.forget(host)) {
+    const QString pattern = store.rules().at(index).pattern;
+    if (!store.forgetAt(index)) {
         out << (store.lastError().isEmpty() ? QStringLiteral("could not write the rules file") : store.lastError())
             << '\n';
         return 1;
     }
 
-    out << "forgot " << host << "; it will ask again\n";
+    out << "forgot " << pattern << "; it will ask again\n";
+
+    // One command drops one memory, so a URL covered by several says what is
+    // still there rather than leaving the next click unexplained.
+    if (store.memoryIndexFor(url) >= 0) {
+        out << "still remembered: " << store.rules().at(store.memoryIndexFor(url)).pattern
+            << " (run --forget again to drop it too)\n";
+    }
     return 0;
 }
 

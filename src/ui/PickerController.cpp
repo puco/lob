@@ -158,7 +158,38 @@ int PickerController::holdMs() const
 
 bool PickerController::isRemembered() const
 {
-    return m_store && m_store->hasMemory(m_link.destination.host());
+    return m_store && m_store->memoryIndexFor(m_link.destination) >= 0;
+}
+
+QVariantList PickerController::memoryScopes() const
+{
+    QVariantList scopes;
+    for (const MemoryScope scope : {MemoryScope::Host, MemoryScope::Domain, MemoryScope::Path}) {
+        const QString pattern = RuleStore::patternFor(scope, m_link.destination);
+        if (pattern.isEmpty()) {
+            continue;
+        }
+        QString label;
+        switch (scope) {
+        case MemoryScope::Host:
+            label = i18nc("%1 is a host name", "Remember for %1", pattern);
+            break;
+        case MemoryScope::Domain:
+            label = i18nc("%1 is a domain name", "Remember for %1 and its subdomains", pattern);
+            break;
+        case MemoryScope::Path:
+            label = i18nc("%1 is a host and the first segment of a path", "Remember for everything under %1", pattern);
+            break;
+        case MemoryScope::None:
+            break;
+        }
+        scopes.append(QVariantMap{
+            {QStringLiteral("scope"), int(scope)},
+            {QStringLiteral("pattern"), pattern},
+            {QStringLiteral("label"), label},
+        });
+    }
+    return scopes;
 }
 
 bool PickerController::hasTargets() const
@@ -517,8 +548,11 @@ void PickerController::runDecision()
     }
 
     // Rewriting the memory once a legacy one has resolved records the profile
-    // it meant, so the same link cannot become ambiguous again later.
-    startLaunch(target, m_decision.privateWindow, decisionPredatesProfileIds());
+    // it meant, so the same link cannot become ambiguous again later. Host is
+    // the right scope by construction: a legacy memory predates scopes, and
+    // every memory written before them was a host memory.
+    startLaunch(target, m_decision.privateWindow,
+                decisionPredatesProfileIds() ? MemoryScope::Host : MemoryScope::None);
 }
 
 bool PickerController::decisionPredatesProfileIds() const
@@ -531,11 +565,11 @@ bool PickerController::launchFallback(const Link &link, const QString &activatio
     const Target target = targetById(targetId);
     if (target.id.isEmpty() || target.kind != TargetKind::Browser) { return false; }
     begin(link, activationToken);
-    startLaunch(target, false, false);
+    startLaunch(target, false, MemoryScope::None);
     return true;
 }
 
-void PickerController::choose(int index, bool privateWindow, bool remember)
+void PickerController::choose(int index, bool privateWindow, int scope)
 {
     if (m_mode != Mode::Picker) {
         return;
@@ -545,10 +579,10 @@ void PickerController::choose(int index, bool privateWindow, bool remember)
         return;
     }
 
-    startLaunch(target, privateWindow, remember);
+    startLaunch(target, privateWindow, static_cast<MemoryScope>(scope));
 }
 
-void PickerController::startLaunch(const Target &target, bool privateWindow, bool remember)
+void PickerController::startLaunch(const Target &target, bool privateWindow, MemoryScope scope)
 {
     m_holdTimer.stop();
     m_launchStalled = false;
@@ -556,14 +590,14 @@ void PickerController::startLaunch(const Target &target, bool privateWindow, boo
     m_mode = Mode::Launching;
     Q_EMIT contextChanged();
     const auto id = ++m_requestId;
-    const QString host = m_link.destination.host();
+    const QUrl remembered = m_link.destination;
     m_operation = QSharedPointer<LaunchOperation>::create();
     QPointer<PickerController> guard(this);
     // The browser is handed toOpen: the same URL, unless a link scanner was
     // read through, in which case it is the scanner's own URL that must be
     // visited even though the decision was made about where it leads.
     m_launcher->launch(target, m_link.toOpen, privateWindow, m_window,
-        [guard, id, target, host, privateWindow, remember](LaunchResult result) {
+        [guard, id, target, remembered, privateWindow, scope](LaunchResult result) {
             if (!guard || guard->m_requestId != id || guard->m_mode != Mode::Launching) {
                 return;
             }
@@ -574,8 +608,8 @@ void PickerController::startLaunch(const Target &target, bool privateWindow, boo
                 Q_EMIT guard->errorOccurred(result.error);
                 return;
             }
-            if (result.outcome == LaunchResult::Started && remember && guard->m_store) {
-                guard->m_store->remember(host, target.id, privateWindow);
+            if (result.outcome == LaunchResult::Started && scope != MemoryScope::None && guard->m_store) {
+                guard->m_store->remember(scope, remembered, target.id, privateWindow);
             }
             guard->finish();
         }, m_activationToken, m_operation);

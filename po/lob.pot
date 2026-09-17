@@ -261,6 +261,24 @@ msgstr ""
 
 #: src/ui/PickerController.cpp
 #, kde-format
+msgctxt "%1 is a host name"
+msgid "Remember for %1"
+msgstr ""
+
+#: src/ui/PickerController.cpp
+#, kde-format
+msgctxt "%1 is a domain name"
+msgid "Remember for %1 and its subdomains"
+msgstr ""
+
+#: src/ui/PickerController.cpp
+#, kde-format
+msgctxt "%1 is a host and the first segment of a path"
+msgid "Remember for everything under %1"
+msgstr ""
+
+#: src/ui/PickerController.cpp
+#, kde-format
 msgid ""
 "The configured browser or profile is unavailable or ambiguous. Choose a "
 "browser for this link."
@@ -288,6 +306,10 @@ msgstr ""
 
 #: qml/Picker.qml
 msgid "Remember for %1"
+msgstr ""
+
+#: qml/Picker.qml
+msgid "R for another scope"
 msgstr ""
 
 #: qml/Picker.qml

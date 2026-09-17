@@ -8,6 +8,7 @@
 #include <QAbstractItemModel>
 #include <QElapsedTimer>
 #include <QObject>
+#include <QVariantList>
 #include <QUrl>
 #include <QTimer>
 #include <QFileSystemWatcher>
@@ -35,6 +36,7 @@ class PickerController : public QObject
     Q_PROPERTY(QString holdReason READ holdReason NOTIFY contextChanged)
     Q_PROPERTY(int holdMs READ holdMs NOTIFY contextChanged)
     Q_PROPERTY(bool remembered READ isRemembered NOTIFY contextChanged)
+    Q_PROPERTY(QVariantList memoryScopes READ memoryScopes NOTIFY contextChanged)
     Q_PROPERTY(bool launching READ isLaunching NOTIFY contextChanged)
     Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY contextChanged)
     Q_PROPERTY(int currentIndex READ currentIndex WRITE setCurrentIndex NOTIFY selectionChanged)
@@ -69,6 +71,15 @@ public:
     QString holdReason() const;
     int holdMs() const;
     bool isRemembered() const;
+
+    /// The scopes "remember this" can be asked for, for the URL on screen, in
+    /// the order the picker cycles them. Each entry carries the scope, the
+    /// literal pattern it would write, and the label naming it -- the pattern
+    /// is shown rather than described, because a memory that turns out to
+    /// cover more than expected is the failure this feature has to avoid.
+    /// Scopes with nothing to say about this URL are left out, so a URL with
+    /// no path never offers to remember a path.
+    QVariantList memoryScopes() const;
     bool isLaunching() const { return m_mode == Mode::Launching; }
     QString errorMessage() const { return m_error; }
 
@@ -105,7 +116,8 @@ public:
 
     bool launchFallback(const Link &link, const QString &activationToken, const QString &targetId);
 
-    Q_INVOKABLE void choose(int index, bool privateWindow, bool remember);
+    /// @p scope is a MemoryScope; MemoryScope::None chooses without remembering.
+    Q_INVOKABLE void choose(int index, bool privateWindow, int scope);
     Q_INVOKABLE void copyUrl();
     Q_INVOKABLE void cancel();
 
@@ -128,7 +140,7 @@ private:
     void checkHeldModifiers();
     void runDecision();
     void begin(const Link &link, const QString &activationToken);
-    void startLaunch(const Target &target, bool privateWindow, bool remember);
+    void startLaunch(const Target &target, bool privateWindow, MemoryScope scope);
     void finish();
     void watchdogExpired();
     void watchTargetSources(const QList<Target> &targets);

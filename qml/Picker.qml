@@ -7,7 +7,12 @@ Window {
     id: root
 
     property bool privateMode: false
-    property bool rememberChoice: false
+
+    // Index into picker.memoryScopes, or -1 for "do not remember". R walks it,
+    // so the scopes offered are only ever ones that apply to this URL.
+    property int rememberIndex: -1
+    readonly property int rememberScope:
+        rememberIndex < 0 ? 0 : picker.memoryScopes[rememberIndex].scope
 
     // Drains 1 -> 0 across the hold. Drives the bar directly rather than
     // animating a control's value, so what is on screen is the time actually
@@ -25,8 +30,16 @@ Window {
 
     function choose(index) {
         if (index >= 0 && index < picker.targets.rowCount()) {
-            picker.choose(index, root.privateMode, root.rememberChoice)
+            picker.choose(index, root.privateMode, root.rememberScope)
         }
+    }
+
+    // R walks "do not remember" -> each applicable scope -> back to not
+    // remembering, so the key both turns it on and takes it back without a
+    // second key to learn.
+    function cycleRemember() {
+        root.rememberIndex = root.rememberIndex + 1 >= picker.memoryScopes.length
+            ? -1 : root.rememberIndex + 1
     }
 
     // Reset per invocation: a stale selection, a lingering private toggle or a
@@ -34,7 +47,7 @@ Window {
     onVisibleChanged: if (visible) {
         picker.currentIndex = 0
         root.privateMode = false
-        root.rememberChoice = false
+        root.rememberIndex = -1
         keyHandler.forceActiveFocus()
     }
 
@@ -114,7 +127,7 @@ Window {
             case Qt.Key_R:
                 // Ctrl+R alongside F5, because that is what every browser does.
                 if (event.modifiers & Qt.ControlModifier) picker.refreshTargets()
-                else root.rememberChoice = !root.rememberChoice
+                else root.cycleRemember()
                 event.accepted = true; return
             case Qt.Key_F5:
                 picker.refreshTargets(); event.accepted = true; return
@@ -338,11 +351,23 @@ Window {
                 enabled: !picker.launching
 
                 QQC2.CheckBox {
-                    checked: root.rememberChoice
-                    onToggled: root.rememberChoice = checked
-                    text: picker.remembered
-                        ? i18n("Update what I remember for %1", picker.displayHost)
-                        : i18n("Remember for %1", picker.displayHost)
+                    visible: picker.memoryScopes.length > 0
+                    checked: root.rememberIndex >= 0
+                    onToggled: root.cycleRemember()
+                    // Naming the scope rather than describing it: the pattern
+                    // about to be written is the thing worth being sure of.
+                    text: root.rememberIndex < 0
+                        ? (picker.remembered
+                            ? i18n("Update what I remember for %1", picker.displayHost)
+                            : i18n("Remember for %1", picker.displayHost))
+                        : picker.memoryScopes[root.rememberIndex].label
+                }
+
+                QQC2.Label {
+                    visible: root.rememberIndex >= 0 && picker.memoryScopes.length > 1
+                    opacity: 0.7
+                    font: Kirigami.Theme.smallFont
+                    text: i18n("R for another scope")
                 }
 
                 QQC2.Label {
