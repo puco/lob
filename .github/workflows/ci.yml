@@ -30,6 +30,15 @@ jobs:
       - name: Check version consistency
         run: ./packaging/check-version.sh
 
+      - name: Check the message template is current
+        # A .pot that has drifted from the sources means a translator works on
+        # strings the application no longer shows, and never sees the ones it
+        # does. Cheaper to catch here than to discover from a stale translation.
+        run: |
+          git config --global --add safe.directory "$PWD"
+          ./Messages.sh
+          git diff --exit-code po/lob.pot
+
       - name: Configure
         run: |
           cmake -B build -G Ninja \
