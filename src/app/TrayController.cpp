@@ -16,7 +16,7 @@ TrayController::TrayController(QObject *parent)
 {
     m_item->setCategory(KStatusNotifierItem::ApplicationStatus);
     m_item->setStatus(KStatusNotifierItem::Passive);
-    m_item->setIconByName(QStringLiteral("internet-web-browser"));
+    m_item->setIconByName(QStringLiteral(LOB_APP_ID));
     m_item->setTitle(i18n("Lob"));
 
     // Left-clicking a link router should do nothing surprising, so the default
@@ -56,10 +56,10 @@ void TrayController::updateStatus()
 {
     if (m_paused) {
         m_item->setIconByName(QStringLiteral("media-playback-pause"));
-        m_item->setToolTip(QStringLiteral("internet-web-browser"), i18n("Lob"), i18n("Routing paused"));
+        m_item->setToolTip(QStringLiteral(LOB_APP_ID), i18n("Lob"), i18n("Routing paused"));
     } else {
-        m_item->setIconByName(QStringLiteral("internet-web-browser"));
-        m_item->setToolTip(QStringLiteral("internet-web-browser"), i18n("Lob"), i18n("Routing links"));
+        m_item->setIconByName(QStringLiteral(LOB_APP_ID));
+        m_item->setToolTip(QStringLiteral(LOB_APP_ID), i18n("Lob"), i18n("Routing links"));
     }
 }
 
