@@ -63,6 +63,7 @@ ctest --test-dir build
 ```bash
 lob --list                 # discovered browsers, profiles and launch commands
 lob --explain <url>        # which rule decides this URL, and which ones lost
+lob --forget <host>        # drop the choice remembered for a host, so it asks again
 lob --status               # who currently handles http/https
 lob --set-default          # claim the handler (records what was there first)
 lob --restore-default      # put the previous browser back
@@ -206,6 +207,11 @@ version 1's case-insensitive behavior; host comparisons are always insensitive.
 
 Explicit rules always win over remembered ones, wherever they sit in the file,
 so a choice made in passing can never shadow one you wrote deliberately.
+
+`lob --forget <host>` drops a remembered choice, so that host asks again. It
+takes a URL as readily as a host, since a URL is usually what you have to hand.
+`lob --explain` names the command when the decision it reports came from a
+memory rather than from a rule you wrote.
 
 ### Other handlers
 
