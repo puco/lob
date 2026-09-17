@@ -129,6 +129,16 @@ startup on the first click:
 systemctl --user enable --now lob.service
 ```
 
+After upgrading, restart it:
+
+```bash
+systemctl --user restart lob.service
+```
+
+Every `lob` command reaches the daemon that is already running, so until it is
+restarted the old one answers -- and an older Lob that does not know a new
+option simply does nothing with it.
+
 ### In the picker
 
 `1`–`9` pick · `/` filter · `P` private window · `R` remember (press again for
