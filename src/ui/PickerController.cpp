@@ -230,8 +230,8 @@ void PickerController::watchTargetSources(const QList<Target> &targets)
 {
     // Watching the profile stores themselves is what makes a new browser
     // profile show up without a restart. Nothing is polled: a store that did
-    // not exist when this ran is not watched, and "Refresh browsers" is the
-    // way in for that case.
+    // not exist when this ran is not watched, and the picker's own refresh is
+    // the way in for that case.
     QStringList paths;
     const QString config = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
     if (QFileInfo::exists(config)) {

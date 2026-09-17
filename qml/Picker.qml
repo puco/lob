@@ -112,7 +112,12 @@ Window {
             case Qt.Key_P:
                 root.privateMode = !root.privateMode; event.accepted = true; return
             case Qt.Key_R:
-                root.rememberChoice = !root.rememberChoice; event.accepted = true; return
+                // Ctrl+R alongside F5, because that is what every browser does.
+                if (event.modifiers & Qt.ControlModifier) picker.refreshTargets()
+                else root.rememberChoice = !root.rememberChoice
+                event.accepted = true; return
+            case Qt.Key_F5:
+                picker.refreshTargets(); event.accepted = true; return
             case Qt.Key_C:
                 picker.copyUrl(); event.accepted = true; return
             }
@@ -345,11 +350,6 @@ Window {
                     text: i18n("Private window")
                     font.bold: true
                 }
-
-                QQC2.Button {
-                    text: i18n("Refresh browsers")
-                    onClicked: picker.refreshTargets()
-                }
             }
 
             QQC2.Label {
@@ -358,7 +358,7 @@ Window {
                 font: Kirigami.Theme.smallFont
                 text: picker.holding
                     ? i18n("Any key or click to choose a different browser")
-                    : i18n("1–9 pick · P private · R remember · C copy · Esc cancel")
+                    : i18n("1–9 pick · P private · R remember · C copy · F5 refresh · Esc cancel")
             }
         }
     }

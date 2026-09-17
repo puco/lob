@@ -80,7 +80,8 @@ systemctl --user enable --now lob.service
 ### In the picker
 
 `1`–`9` pick · `P` private window · `R` remember for this host · `C` copy
-instead of opening · `Esc` cancel · arrows and `Enter` also work.
+instead of opening · `F5` (or `Ctrl+R`) rescan browsers · `Esc` cancel · arrows
+and `Enter` also work.
 
 Holding **Shift** while clicking a link forces the picker even when a rule
 would have matched. During the hold bar, any key or click does the same.
@@ -94,7 +95,7 @@ After copying, a one-shot process stays alive while it owns the clipboard so
 the selection remains available. On Wayland, even a zero-hold copy briefly
 presents a surface to obtain the focus required to own the selection.
 
-Browser/profile changes are discovered automatically. **Refresh browsers**
+Browser/profile changes are discovered automatically. `F5` in the picker
 rescans immediately. Explicit profile IDs remain stable when other profiles are
 added or removed; a plain desktop ID selects the browser's own default. Old
 remembered desktop IDs are upgraded only when a single profile makes the
