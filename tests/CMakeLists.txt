@@ -8,6 +8,12 @@ foreach(test RuleEngineTest RuleStoreTest BrowserProfilesTest LauncherTest Targe
     ecm_mark_as_test(${test})
 endforeach()
 
+add_executable(ShortenerResolverTest ShortenerResolverTest.cpp)
+target_link_libraries(ShortenerResolverTest PRIVATE lobcore Qt6::Test Qt6::Network)
+add_test(NAME ShortenerResolverTest COMMAND ShortenerResolverTest)
+set_tests_properties(ShortenerResolverTest PROPERTIES TIMEOUT 60)
+ecm_mark_as_test(ShortenerResolverTest)
+
 add_executable(PickerControllerTest PickerControllerTest.cpp)
 target_link_libraries(PickerControllerTest PRIVATE lobui Qt6::Test)
 add_test(NAME PickerControllerTest COMMAND PickerControllerTest)

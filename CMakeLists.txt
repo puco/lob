@@ -44,6 +44,7 @@ add_library(lobcore STATIC
     src/core/RedirectUnwrapper.cpp
     src/core/RuleEngine.cpp
     src/core/RuleStore.cpp
+    src/core/ShortenerResolver.cpp
     src/core/Startup.cpp
     src/core/TargetRegistry.cpp
     src/core/UrlSanitizer.cpp

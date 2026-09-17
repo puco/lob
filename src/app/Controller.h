@@ -14,6 +14,7 @@ namespace Lob
 
 class PickerController;
 class RuleStore;
+class ShortenerResolver;
 class TrayController;
 
 /**
@@ -58,14 +59,18 @@ private:
         bool forcePicker = false;
     };
 
+    Link prepare(const QUrl &rawUrl) const;
     void enqueue(const QUrl &rawUrl, const QString &token, bool forcePicker);
     void processQueue();
+    void route(const PendingUrl &pending);
+    ShortenerResolver *resolver();
     void onPickerFinished();
     void releaseClipboard();
     void quitWhenIdle();
 
     QQmlApplicationEngine *m_engine = nullptr;
     RuleStore *m_store = nullptr;
+    ShortenerResolver *m_resolver = nullptr;
     PickerController *m_picker = nullptr;
     TrayController *m_tray = nullptr;
 

@@ -63,6 +63,10 @@ public:
     /// Redirectors beyond the built-in ones: "host[/path]" -> query parameter.
     QMap<QString, QString> redirectWrappers() const;
 
+    /// Whether a shortener may be asked over the network where its link goes.
+    /// Off by default: it costs a request, and a wait, per shortened link.
+    bool resolveShorteners() const;
+
     /// Ids of "other handler" targets the user has explicitly enabled.
     QStringList enabledOtherHandlers() const;
     bool setOtherHandlerEnabled(const QString &targetId, bool enabled);
@@ -83,6 +87,7 @@ private:
     bool m_stripTracking = true;
     QStringList m_trackingParameters;
     bool m_unwrapRedirects = true;
+    bool m_resolveShorteners = false;
     QMap<QString, QString> m_redirectWrappers;
     QStringList m_enabledOtherHandlers;
     QFileSystemWatcher *m_watcher;

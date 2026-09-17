@@ -134,8 +134,17 @@ destination but still hands the browser the scanner's URL. Everything else opens
 as the destination, which leaves the click-tracker out of it entirely.
 
 Shorteners (`t.co`, `bit.ly`, `lnkd.in`) keep their destination on their own
-server, so there is nothing to read without asking them. Those links are routed
-as-is and the browser follows the redirect as before.
+server, so there is nothing to read without asking them. By default those links
+are routed as-is and the browser follows the redirect as before. Turning on
+
+```json
+"resolveShorteners": true
+```
+
+makes Lob ask instead: a cookieless `HEAD` request, at most 1.5s, before the
+link is routed. The trade is real — the link waits for it, the shortener sees a
+request from this machine before the browser makes one, and an unreachable or
+slow shortener simply routes as it arrived. Off unless you want that.
 
 Add a redirector Lob does not know with `redirectWrappers`, mapping
 `host` or `host/path` to the query parameter holding the destination:

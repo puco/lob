@@ -37,7 +37,8 @@ bool validate(const QJsonObject &root, QList<Rule> &rules, QString &error)
             return bad(QStringLiteral("holdMs (integer from 0 to 60000)"));
         }
     }
-    for (const auto &key : {QStringLiteral("stripTracking"), QStringLiteral("unwrapRedirects")}) {
+    for (const auto &key : {QStringLiteral("stripTracking"), QStringLiteral("unwrapRedirects"),
+                            QStringLiteral("resolveShorteners")}) {
         if (root.contains(key) && !root.value(key).isBool()) {
             return bad(key);
         }
@@ -214,6 +215,7 @@ void RuleStore::apply(const QJsonObject &root, const QList<Rule> &rules)
         ? strings(root.value(QStringLiteral("trackingParameters"))) : UrlSanitizer::defaultTrackingParameters();
     m_enabledOtherHandlers = strings(root.value(QStringLiteral("enabledOtherHandlers")));
     m_unwrapRedirects = root.value(QStringLiteral("unwrapRedirects")).toBool(true);
+    m_resolveShorteners = root.value(QStringLiteral("resolveShorteners")).toBool(false);
     m_redirectWrappers.clear();
     const auto wrappers = root.value(QStringLiteral("redirectWrappers")).toObject();
     for (auto it = wrappers.constBegin(); it != wrappers.constEnd(); ++it) {
@@ -346,6 +348,7 @@ int RuleStore::holdMs() const { return m_holdMs; }
 bool RuleStore::stripTracking() const { return m_stripTracking; }
 QStringList RuleStore::trackingParameters() const { return m_trackingParameters; }
 bool RuleStore::unwrapRedirects() const { return m_unwrapRedirects; }
+bool RuleStore::resolveShorteners() const { return m_resolveShorteners; }
 QMap<QString, QString> RuleStore::redirectWrappers() const { return m_redirectWrappers; }
 QStringList RuleStore::enabledOtherHandlers() const { return m_enabledOtherHandlers; }
 

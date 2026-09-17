@@ -3,6 +3,7 @@
 #include "TrayController.h"
 #include "core/RuleEngine.h"
 #include "core/RuleStore.h"
+#include "core/ShortenerResolver.h"
 #include "core/UrlSanitizer.h"
 #include "core/DefaultBrowserManager.h"
 #include "ui/PickerController.h"
@@ -147,10 +148,8 @@ void Controller::handleUrls(const QList<QUrl> &urls, const QString &activationTo
     }
 }
 
-void Controller::enqueue(const QUrl &rawUrl, const QString &token, bool forcePicker)
+Link Controller::prepare(const QUrl &rawUrl) const
 {
-    m_acceptedAnyUrl = true;
-
     // A link clicked in a chat client or a search result arrives wrapped in a
     // redirector, so read it through to where it actually goes first: asking
     // about the redirector, and remembering it, would answer a question about
@@ -164,8 +163,7 @@ void Controller::enqueue(const QUrl &rawUrl, const QString &token, bool forcePic
     // Strip before the rules see it, so a rule matching on query parameters
     // matches what will actually be opened rather than what arrived.
     if (m_store->stripTracking()) {
-        const QStringList patterns = m_store->trackingParameters();
-        const QUrl destination = UrlSanitizer::strip(link.destination, patterns);
+        const QUrl destination = UrlSanitizer::strip(link.destination, m_store->trackingParameters());
         if (destination != link.destination) {
             qCDebug(LOG_CONTROLLER) << "stripped tracking parameters for host" << destination.host();
         }
@@ -174,8 +172,13 @@ void Controller::enqueue(const QUrl &rawUrl, const QString &token, bool forcePic
         link.toOpen = link.toOpen == link.destination ? destination : link.toOpen;
         link.destination = destination;
     }
+    return link;
+}
 
-    m_queue.enqueue({link, token, forcePicker});
+void Controller::enqueue(const QUrl &rawUrl, const QString &token, bool forcePicker)
+{
+    m_acceptedAnyUrl = true;
+    m_queue.enqueue({prepare(rawUrl), token, forcePicker});
     processQueue();
 }
 
@@ -185,9 +188,41 @@ void Controller::processQueue()
         return;
     }
 
-    const PendingUrl pending = m_queue.dequeue();
+    PendingUrl pending = m_queue.dequeue();
     m_busy = true;
 
+    // A shortener keeps its destination on its own server, so this is the one
+    // redirect that has to be asked about. The link waits while that happens,
+    // which is why it is off unless configured, and why it is asked here
+    // rather than on arrival: the queue keeps its order either way.
+    if (m_store->resolveShorteners() && RedirectUnwrapper::isShortener(pending.link.destination)) {
+        resolver()->resolve(pending.link.destination, [this, pending](const QUrl &destination) mutable {
+            if (destination != pending.link.destination) {
+                qCDebug(LOG_CONTROLLER) << "resolved a shortened link from" << pending.link.destination.host()
+                                        << "to host" << destination.host();
+                // Whatever it resolved to gets read the same way anything else
+                // does: it may be wrapped in turn, and it may carry tracking.
+                pending.link = prepare(destination);
+            }
+            route(pending);
+        });
+        return;
+    }
+
+    route(pending);
+}
+
+ShortenerResolver *Controller::resolver()
+{
+    // Built on first use: with the default configuration nothing ever asks.
+    if (!m_resolver) {
+        m_resolver = new ShortenerResolver(this);
+    }
+    return m_resolver;
+}
+
+void Controller::route(const PendingUrl &pending)
+{
     // While paused, links still open -- they just skip the question. Queueing
     // them up to ask later would be worse than picking a sensible browser now:
     // the configured fallback, else whatever handled links before we did. Only
