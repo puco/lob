@@ -69,7 +69,8 @@ target_link_libraries(lobcore PUBLIC
     KF6::Service KF6::KIOGui KF6::WindowSystem
 )
 
-add_library(lobui STATIC src/ui/PickerController.cpp src/ui/TargetModel.cpp)
+add_library(lobui STATIC src/ui/PickerController.cpp src/ui/TargetModel.cpp src/ui/RuleModel.cpp
+                        src/ui/SettingsController.cpp)
 target_link_libraries(lobui PUBLIC lobcore Qt6::Qml Qt6::Quick LayerShellQt::Interface)
 
 add_executable(lob)
@@ -100,6 +101,7 @@ ecm_add_qml_module(lob
 
 ecm_target_qml_sources(lob SOURCES
     qml/Picker.qml
+    qml/Settings.qml
 )
 
 install(TARGETS lob ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})

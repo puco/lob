@@ -300,6 +300,7 @@ void printUsage(QTextStream &out)
                           "\n"
                           "usage: lob [--daemon] [--pick] <url>\n"
                           "       lob --list | --explain <url> | --forget <host> | --status\n"
+                          "       lob --settings\n"
                           "       lob --set-default | --restore-default\n"
                           "\n"
                           "  <url>               route one URL: a rule decides, or the picker asks\n"
@@ -308,6 +309,7 @@ void printUsage(QTextStream &out)
                           "  --list              discovered browsers, profiles and launch commands\n"
                           "  --explain <url>     which rule decides this URL, and which ones lose\n"
                           "  --forget <host>     drop the choice remembered for a host, so it asks again\n"
+                          "  --settings          open the settings window\n"
                           "  --status            who currently handles http and https\n"
                           "  --set-default       claim the handler, recording what was there first\n"
                           "  --restore-default   put the previous handler back\n"
@@ -445,7 +447,8 @@ int main(int argc, char *argv[])
 
     QTimer::singleShot(0, &controller, [&controller, rawArgs, inboundToken, daemonMode] {
         controller.handleArgs(rawArgs, inboundToken);
-        if (!daemonMode && !controller.isBusy() && !controller.servingClipboard()) {
+        if (!daemonMode && !controller.isBusy() && !controller.servingClipboard()
+                && !controller.showingSettings()) {
             QCoreApplication::exit(controller.acceptedAnyUrl() ? 0 : 2);
         }
     });

@@ -14,6 +14,7 @@ namespace Lob
 
 class PickerController;
 class RuleStore;
+class SettingsController;
 class ShortenerResolver;
 class TrayController;
 
@@ -44,6 +45,14 @@ public:
     /// From KDBusService::openRequested -- URLs from KIO/GIO.
     void handleUrls(const QList<QUrl> &urls, const QString &activationToken);
 
+    /// Opens the settings window, building it on first use. The daemon
+    /// already holds the QML engine and the one RuleStore, so the window is a
+    /// second view onto them rather than a second copy of anything.
+    void showSettings();
+
+    /// True while the settings window is on screen.
+    bool showingSettings() const;
+
     /// True while a picker is on screen.
     bool isBusy() const;
     bool acceptedAnyUrl() const { return m_acceptedAnyUrl; }
@@ -72,6 +81,7 @@ private:
     RuleStore *m_store = nullptr;
     ShortenerResolver *m_resolver = nullptr;
     PickerController *m_picker = nullptr;
+    SettingsController *m_settings = nullptr;
     TrayController *m_tray = nullptr;
 
     // Each URL carries its own activation token: tokens are single-use, so two

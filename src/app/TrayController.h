@@ -20,6 +20,7 @@ Q_SIGNALS:
     /// Routing is paused: send links straight to the fallback browser.
     void pausedChanged(bool paused);
     void routeClipboardRequested();
+    void settingsRequested();
     void quitRequested();
 
 private:

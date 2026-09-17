@@ -28,6 +28,9 @@ TrayController::TrayController(QObject *parent)
     auto *clipboard = menu->addAction(QIcon::fromTheme(QStringLiteral("edit-paste")), i18n("Open Link in Clipboard…"));
     connect(clipboard, &QAction::triggered, this, &TrayController::routeClipboardRequested);
 
+    auto *configure = menu->addAction(QIcon::fromTheme(QStringLiteral("configure")), i18n("Configure Lob…"));
+    connect(configure, &QAction::triggered, this, &TrayController::settingsRequested);
+
     menu->addSeparator();
 
     auto *pause = menu->addAction(QIcon::fromTheme(QStringLiteral("media-playback-pause")), i18n("Pause Routing"));

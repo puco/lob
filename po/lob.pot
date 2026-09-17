@@ -29,6 +29,11 @@ msgstr ""
 
 #: src/app/TrayController.cpp
 #, kde-format
+msgid "Configure Lob…"
+msgstr ""
+
+#: src/app/TrayController.cpp
+#, kde-format
 msgid "Pause Routing"
 msgstr ""
 
@@ -344,4 +349,143 @@ msgstr ""
 msgid ""
 "1–9 pick · / filter · P private · R remember · C copy · F5 refresh · Esc "
 "cancel"
+msgstr ""
+
+#: qml/Settings.qml
+msgctxt "@title:window"
+msgid "Lob Settings"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "Host"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "Domain"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "URL prefix"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "Regular expression"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "Open"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "Always ask"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "Copy"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "(none)"
+msgstr ""
+
+#: qml/Settings.qml
+msgctxt "browser, profile"
+msgid "%1 — %2"
+msgstr ""
+
+#: qml/Settings.qml
+msgctxt "a target id that is not installed"
+msgid "%1 (not installed)"
+msgstr ""
+
+#: qml/Settings.qml
+msgctxt "@title"
+msgid "Lob"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "Rules"
+msgstr ""
+
+#: qml/Settings.qml
+msgid ""
+"The first rule that matches decides, so order matters. Rules always beat "
+"remembered choices."
+msgstr ""
+
+#: qml/Settings.qml
+msgid "A disabled rule stays in the file and decides nothing"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "Match this earlier"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "Match this later"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "Delete this rule"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "Add Rule…"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "Remembered choices"
+msgstr ""
+
+#: qml/Settings.qml
+msgid ""
+"Written by “remember” in the picker, narrowest first. Delete one to be asked "
+"again."
+msgstr ""
+
+#: qml/Settings.qml
+msgid "Forget this"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "Other applications"
+msgstr ""
+
+#: qml/Settings.qml
+msgid ""
+"These register for links without being browsers. They are hidden from the "
+"picker until enabled here."
+msgstr ""
+
+#: qml/Settings.qml
+msgid "Behaviour"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "Hold bar:"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "ms — zero opens immediately, with nothing to interrupt"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "ms before a decided link opens"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "Strip tracking parameters from links"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "Everything here is %1, which stays hand-editable."
+msgstr ""
+
+#: qml/Settings.qml
+msgctxt "@title:window"
+msgid "Add Rule"
+msgstr ""
+
+#: qml/Settings.qml
+msgid "Add"
 msgstr ""
