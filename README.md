@@ -130,10 +130,21 @@ systemctl --user enable --now lob.service
 
 ### In the picker
 
-`1`–`9` pick · `P` private window · `R` remember (press again for a wider
-scope) · `C` copy
-instead of opening · `F5` (or `Ctrl+R`) rescan browsers · `Esc` cancel · arrows
-and `Enter` also work.
+`1`–`9` pick · `/` filter · `P` private window · `R` remember (press again for
+a wider scope) · `C` copy instead of opening · `F5` (or `Ctrl+R`) rescan
+browsers · `Esc` cancel · arrows and `Enter` also work.
+
+`/` or `Ctrl+F` starts filtering, which is what the list needs once a machine
+has more browsers and profiles than there are digits. Every whitespace-separated
+term has to appear somewhere -- the label, the profile name or the desktop id --
+so `fire work` finds Firefox's work profile without knowing which field holds
+which word, and `chromium.desktop` finds it by the id `lob --list` prints.
+
+The digits keep working while filtering and number the cells left on screen, so
+narrowing the list and pressing `1` is the fast path. `P`, `R` and `C` are
+letters, so while filtering they move to `Alt+P`, `Alt+R` and `Alt+C`. `Esc`
+clears the filter first and cancels the picker second, and `Backspace` past the
+start of the filter leaves filtering as well.
 
 Holding **Shift** while clicking a link forces the picker even when a rule
 would have matched. During the hold bar, any key or click does the same.

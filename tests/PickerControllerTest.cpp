@@ -1,4 +1,5 @@
 #include "ui/PickerController.h"
+#include "ui/TargetModel.h"
 #include "core/RuleStore.h"
 #include "core/RuleEngine.h"
 #include <QTemporaryDir>
@@ -40,6 +41,125 @@ class PickerControllerTest : public QObject
 private Q_SLOTS:
     void initTestCase() { QVERIFY(config.isValid()); qputenv("XDG_CONFIG_HOME", config.path().toUtf8()); }
     void init() { QFile::remove(RuleStore::filePath()); }
+
+    /// Three browsers with distinguishable labels, profiles and desktop ids,
+    /// so a filter test can tell which field it matched on.
+    void populateMany(PickerController &picker)
+    {
+        auto make = [](const QString &id, const QString &label, const QString &profile) {
+            Target t;
+            t.id = id;
+            t.storageId = id.section(QLatin1Char('#'), 0, 0);
+            t.label = label;
+            t.profileName = profile;
+            t.kind = TargetKind::Browser;
+            return t;
+        };
+        picker.setTargets({
+            make(QStringLiteral("firefox.desktop#work"), QStringLiteral("Firefox"), QStringLiteral("Work")),
+            make(QStringLiteral("firefox.desktop#home"), QStringLiteral("Firefox"), QStringLiteral("Home")),
+            make(QStringLiteral("chromium.desktop"), QStringLiteral("Chromium"), QString()),
+        });
+    }
+
+    void filteringNarrowsTheListAndRenumbersTheDigits()
+    {
+        RuleStore store;
+        FakeLauncher launcher;
+        PickerController picker(&store, nullptr, &launcher);
+        populateMany(picker);
+        QCOMPARE(picker.targetsModel()->rowCount(), 3);
+
+        picker.setFilter(QStringLiteral("chrom"));
+        QCOMPARE(picker.targetsModel()->rowCount(), 1);
+
+        // The digit is the row on screen: after filtering, 1 must mean the one
+        // cell left, not the row it used to occupy.
+        const QModelIndex first = picker.targetsModel()->index(0, 0);
+        QCOMPARE(picker.targetsModel()->data(first, TargetModel::ShortcutRole).toString(), QStringLiteral("1"));
+        QCOMPARE(picker.targetsModel()->data(first, TargetModel::LabelRole).toString(), QStringLiteral("Chromium"));
+    }
+
+    void everyTermMustMatchButNotAllInTheSameField()
+    {
+        RuleStore store;
+        FakeLauncher launcher;
+        PickerController picker(&store, nullptr, &launcher);
+        populateMany(picker);
+
+        // Label and profile name, one term each.
+        picker.setFilter(QStringLiteral("fire work"));
+        QCOMPARE(picker.targetsModel()->rowCount(), 1);
+
+        // The desktop id is searchable because that is what --list prints and
+        // what rules are written against.
+        picker.setFilter(QStringLiteral("chromium.desktop"));
+        QCOMPARE(picker.targetsModel()->rowCount(), 1);
+
+        // Every term has to land somewhere.
+        picker.setFilter(QStringLiteral("firefox chromium"));
+        QCOMPARE(picker.targetsModel()->rowCount(), 0);
+    }
+
+    void narrowingKeepsTheHighlightOnTheSameTarget()
+    {
+        RuleStore store;
+        FakeLauncher launcher;
+        PickerController picker(&store, nullptr, &launcher);
+        populateMany(picker);
+
+        picker.setCurrentIndex(2); // Chromium
+        picker.setFilter(QStringLiteral("chrom"));
+        // Still on Chromium, which is now row 0 -- the selection follows the
+        // target rather than the row number.
+        QCOMPARE(picker.currentIndex(), 0);
+        QCOMPARE(picker.targetsModel()->data(picker.targetsModel()->index(0, 0), TargetModel::LabelRole).toString(),
+                 QStringLiteral("Chromium"));
+
+        // A filter that hides the selection takes the highlight to the top
+        // rather than leaving it pointing at a row that is not shown.
+        picker.setFilter(QStringLiteral("firefox"));
+        QCOMPARE(picker.currentIndex(), 0);
+    }
+
+    void afilterThatMatchesNothingSelectsNothingAndChoosesNothing()
+    {
+        RuleStore store;
+        FakeLauncher launcher;
+        PickerController picker(&store, nullptr, &launcher);
+        populateMany(picker);
+        picker.showPicker(Link::plain(url), QString());
+
+        picker.setFilter(QStringLiteral("nothingmatchesthis"));
+        QCOMPARE(picker.targetsModel()->rowCount(), 0);
+        QCOMPARE(picker.currentIndex(), -1);
+
+        // Enter on an empty list must not launch whatever used to be row 0.
+        picker.choose(picker.currentIndex(), false, int(MemoryScope::None));
+        QCOMPARE(launcher.callbacks.size(), 0);
+
+        // The browsers are still there; the filter is what is hiding them, and
+        // the picker has to be able to say so.
+        QCOMPARE(picker.unfilteredCount(), 3);
+    }
+
+    void eachLinkStartsUnfiltered()
+    {
+        RuleStore store;
+        FakeLauncher launcher;
+        PickerController picker(&store, nullptr, &launcher);
+        populateMany(picker);
+
+        picker.showPicker(Link::plain(url), QString());
+        picker.setFilter(QStringLiteral("chrom"));
+        QCOMPARE(picker.targetsModel()->rowCount(), 1);
+
+        // A filter left over from the previous link would hide browsers with
+        // no explanation on screen for why.
+        picker.showPicker(Link::plain(QUrl(QStringLiteral("https://other.example/"))), QString());
+        QCOMPARE(picker.filter(), QString());
+        QCOMPARE(picker.targetsModel()->rowCount(), 3);
+    }
 
     void enablingAnOtherHandlerRefiltersWithoutRediscovering()
     {

@@ -40,6 +40,10 @@ class PickerController : public QObject
     Q_PROPERTY(bool launching READ isLaunching NOTIFY contextChanged)
     Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY contextChanged)
     Q_PROPERTY(int currentIndex READ currentIndex WRITE setCurrentIndex NOTIFY selectionChanged)
+    Q_PROPERTY(QString filter READ filter WRITE setFilter NOTIFY filterChanged)
+    /// How many targets exist before filtering, so the picker can say that a
+    /// filter is hiding some rather than looking like the browsers vanished.
+    Q_PROPERTY(int unfilteredCount READ unfilteredCount NOTIFY filterChanged)
 
 public:
     enum class Mode {
@@ -100,6 +104,10 @@ public:
     void setTargets(const QList<Target> &targets);
     int currentIndex() const { return m_currentIndex; }
     void setCurrentIndex(int index);
+
+    QString filter() const;
+    void setFilter(const QString &text);
+    int unfilteredCount() const;
     bool ensureWindow(QQmlApplicationEngine *engine);
     bool hasTargets() const;
 
@@ -129,6 +137,7 @@ public:
 
 Q_SIGNALS:
     void contextChanged();
+    void filterChanged();
     void finished();
     void errorOccurred(const QString &message);
     void selectionChanged();
