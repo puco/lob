@@ -55,6 +55,10 @@ jobs:
 
       - name: Build the release package from this revision
         run: |
+          # The workspace belongs to the runner's user, not to root inside the
+          # container, and git refuses to touch a repository it thinks someone
+          # else owns. The release workflow marks it safe for the same reason.
+          git config --global --add safe.directory "$PWD"
           version=$(sed -nE 's/^project\(lob VERSION ([0-9.]+).*/\1/p' CMakeLists.txt)
           git archive --format=tar.gz --prefix="lob-$version/" -o "lob-$version.tar.gz" HEAD
           useradd -m builder
