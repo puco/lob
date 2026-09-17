@@ -61,7 +61,9 @@ bool Controller::initialize()
     m_picker->refreshTargets();
 
     // An edit to rules.json outside the app takes effect without a restart.
-    connect(m_store, &RuleStore::changed, m_picker, &PickerController::refreshTargets);
+    // Only the handler filter can have changed: rules.json cannot install or
+    // remove a browser, so there is nothing to ask the system about.
+    connect(m_store, &RuleStore::changed, m_picker, &PickerController::refreshEnabledHandlers);
 
     // Building the window now rather than on first use is the whole point of
     // running as a daemon: otherwise the first link after login still pays the

@@ -184,11 +184,28 @@ void PickerController::refreshTargets()
         return;
     }
 
-    auto targets = TargetRegistry::discover(QStringLiteral(LOB_APP_ID ".desktop"));
+    m_discovered = TargetRegistry::discover(QStringLiteral(LOB_APP_ID ".desktop"));
+
+    // Watching is driven by what exists, not by what the filter lets through:
+    // a profile store is worth noticing whether or not its handler is listed
+    // today, since enabling one must not then require a restart to see it.
+    watchTargetSources(m_discovered);
+    refreshEnabledHandlers();
+}
+
+void PickerController::refreshEnabledHandlers()
+{
+    if (m_mode == Mode::Launching || m_mode == Mode::Hold) {
+        // Deferring to a full refresh is a superset of what is needed here,
+        // and keeps one timer rather than two racing to touch the same list.
+        m_refreshTimer.start(kRefreshWhileBusyMs);
+        return;
+    }
 
     // Handlers that are not browsers stay hidden until explicitly enabled, but
     // they are never filtered out of discovery -- whether routing a link to one
     // is useful is the user's call, not ours.
+    auto targets = m_discovered;
     if (m_store) {
         const QStringList enabled = m_store->enabledOtherHandlers();
         targets.removeIf([&enabled](const Target &target) {
@@ -196,11 +213,18 @@ void PickerController::refreshTargets()
         });
     }
 
-    watchTargetSources(targets);
-    setTargets(targets);
+    applyTargets(targets);
 }
 
 void PickerController::setTargets(const QList<Target> &targets)
+{
+    // The whole routable set, arriving already filtered. Recording it as what
+    // was discovered keeps a later filter pass from working off an empty list.
+    m_discovered = targets;
+    applyTargets(targets);
+}
+
+void PickerController::applyTargets(const QList<Target> &targets)
 {
     // Rules and memories resolve against everything discovered; the list only
     // shows what is worth reading.

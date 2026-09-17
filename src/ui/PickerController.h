@@ -72,10 +72,20 @@ public:
     bool isLaunching() const { return m_mode == Mode::Launching; }
     QString errorMessage() const { return m_error; }
 
+    /// Asks the system what is installed, then applies the filter below.
+    /// F5 in the picker, a KSycoca change, and a profile store changing on
+    /// disk all land here.
     Q_INVOKABLE void refreshTargets();
 
-    /// Replaces what is routable and listed. refreshTargets() is where these
-    /// normally come from; tests use it to run without a KSycoca database.
+    /// Re-applies the enabledOtherHandlers filter to what discovery last
+    /// found. A configuration change cannot install or remove a browser, so
+    /// it has no business asking the system about them again.
+    void refreshEnabledHandlers();
+
+    /// Replaces what is routable, filter already applied. refreshTargets() is
+    /// where these normally come from; tests use it to run without a KSycoca
+    /// database, which is why it does not filter: a hand-built Target defaults
+    /// to OtherHandler, and filtering here would drop every one of them.
     void setTargets(const QList<Target> &targets);
     int currentIndex() const { return m_currentIndex; }
     void setCurrentIndex(int index);
@@ -122,6 +132,7 @@ private:
     void finish();
     void watchdogExpired();
     void watchTargetSources(const QList<Target> &targets);
+    void applyTargets(const QList<Target> &targets);
     bool decisionPredatesProfileIds() const;
 
     RuleStore *m_store;
@@ -129,7 +140,8 @@ private:
     Launcher *m_launcher;
     QWindow *m_window = nullptr;
 
-    QList<Target> m_targets; // everything discovered; the model lists a subset
+    QList<Target> m_discovered; // what the system has, before the user's filter
+    QList<Target> m_targets; // everything routable; the model lists a subset
     Link m_link;
     Mode m_mode = Mode::Idle;
     Decision m_decision;
