@@ -1,6 +1,8 @@
 #include "RuleStore.h"
 #include "UrlSanitizer.h"
 
+#include <KLocalizedString>
+
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -242,7 +244,7 @@ bool RuleStore::load()
     }
     if (!file.open(QIODevice::ReadOnly)) {
         m_writable = false;
-        return fail(tr("Cannot read rules.json; keeping the last valid configuration."));
+        return fail(i18n("Cannot read rules.json; keeping the last valid configuration."));
     }
     const QByteArray bytes = file.readAll();
     if (m_hasFile && m_writable && bytes == m_snapshot) {
@@ -254,7 +256,7 @@ bool RuleStore::load()
     QString error;
     if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
         m_writable = false;
-        return fail(tr("Invalid rules.json at byte %1; keeping the last valid configuration.").arg(parseError.offset));
+        return fail(i18n("Invalid rules.json at byte %1; keeping the last valid configuration.", parseError.offset));
     }
     if (!validate(doc.object(), rules, error)) {
         m_writable = false;
@@ -269,7 +271,7 @@ bool RuleStore::load()
 bool RuleStore::writeRoot(const QJsonObject &root)
 {
     if (!m_writable) {
-        Q_EMIT errorOccurred(tr("Cannot save until rules.json is readable and valid again."));
+        Q_EMIT errorOccurred(i18n("Cannot save until rules.json is readable and valid again."));
         return false;
     }
     QList<Rule> rules;
@@ -279,22 +281,22 @@ bool RuleStore::writeRoot(const QJsonObject &root)
     }
     const QString path = filePath();
     if (!QDir().mkpath(QFileInfo(path).absolutePath())) {
-        return fail(tr("Cannot create the Lob configuration directory."));
+        return fail(i18n("Cannot create the Lob configuration directory."));
     }
     QLockFile lock(path + QStringLiteral(".lock"));
     if (!lock.tryLock(0)) {
-        return fail(tr("Another process is updating rules.json; try again."));
+        return fail(i18n("Another process is updating rules.json; try again."));
     }
     QFile current(path);
     const bool exists = QFileInfo::exists(path);
     if (exists != m_hasFile || (exists && (!current.open(QIODevice::ReadOnly) || current.readAll() != m_snapshot))) {
         load();
-        return fail(tr("rules.json changed externally. Review the new configuration and try again."));
+        return fail(i18n("rules.json changed externally. Review the new configuration and try again."));
     }
     const QByteArray bytes = QJsonDocument(root).toJson(QJsonDocument::Indented);
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit()) {
-        return fail(tr("Could not save rules.json: %1").arg(file.errorString()));
+        return fail(i18n("Could not save rules.json: %1", file.errorString()));
     }
     m_snapshot = bytes;
     m_hasFile = true;

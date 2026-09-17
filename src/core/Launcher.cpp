@@ -1,6 +1,8 @@
 #include "Launcher.h"
 #include "UrlSanitizer.h"
 
+#include <KLocalizedString>
+
 #include <KIO/ApplicationLauncherJob>
 #include <KService>
 #include <KServiceAction>
@@ -266,12 +268,12 @@ void Launcher::launch(const Target &target,
 
     const auto command = target.launchCommand(privateWindow);
     if (!commandIsSafe(command.isEmpty() ? QStringList{target.execPath} : command)) {
-        done({LaunchResult::Failed, tr("Refusing to launch %1: not a browser executable.").arg(target.execPath)});
+        done({LaunchResult::Failed, i18n("Refusing to launch %1: not a browser executable.", target.execPath)});
         return;
     }
 
     if (privateWindow && !target.supportsPrivate()) {
-        done({LaunchResult::Failed, tr("%1 does not support private browsing.").arg(target.label)});
+        done({LaunchResult::Failed, i18n("%1 does not support private browsing.", target.label)});
         return;
     }
 
@@ -326,7 +328,7 @@ void Launcher::doLaunch(const Target &target, const QUrl &url, bool privateWindo
         connect(job, &KJob::result, this, [completion, target](KJob *finished) {
             // KIO error text can contain the URL. Keep diagnostics free of its credentials/query.
             completion(finished->error() ? LaunchResult{LaunchResult::Failed,
-                tr("Could not launch %1 (error %2).").arg(target.label).arg(finished->error())} : LaunchResult{});
+                i18n("Could not launch %1 (error %2).", target.label, static_cast<int>(finished->error()))} : LaunchResult{});
         });
         job->start();
     };
@@ -345,7 +347,7 @@ void Launcher::doLaunch(const Target &target, const QUrl &url, bool privateWindo
 
     const QStringList argv = buildArgv(target, url, privateWindow);
     if (argv.isEmpty()) {
-        completion({LaunchResult::Failed, tr("Unsupported desktop launch command for %1.").arg(target.label)});
+        completion({LaunchResult::Failed, i18n("Unsupported desktop launch command for %1.", target.label)});
         return;
     }
     const QString program = argv.constFirst();
@@ -375,7 +377,7 @@ void Launcher::doLaunch(const Target &target, const QUrl &url, bool privateWindo
     }
     process.setProcessEnvironment(environment);
     const bool started = process.startDetached();
-    completion(started ? LaunchResult{} : LaunchResult{LaunchResult::Failed, tr("Could not start %1.").arg(program)});
+    completion(started ? LaunchResult{} : LaunchResult{LaunchResult::Failed, i18n("Could not start %1.", program)});
 }
 
 } // namespace Lob
