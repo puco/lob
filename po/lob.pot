@@ -1,0 +1,305 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR Lob contributors
+# This file is distributed under the same license as the lob package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: lob\n"
+"Report-Msgid-Bugs-To: https://github.com/puco/lob/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: src/app/Controller.cpp:91 src/app/Controller.cpp:107
+#: src/app/TrayController.cpp:20 src/app/TrayController.cpp:59
+#: src/app/TrayController.cpp:62 src/main.cpp:334
+#, kde-format
+msgid "Lob"
+msgstr ""
+
+#: src/app/TrayController.cpp:28
+#, kde-format
+msgid "Open Link in Clipboard…"
+msgstr ""
+
+#: src/app/TrayController.cpp:33
+#, kde-format
+msgid "Pause Routing"
+msgstr ""
+
+#: src/app/TrayController.cpp:43
+#, kde-format
+msgid "Quit"
+msgstr ""
+
+#: src/app/TrayController.cpp:59
+#, kde-format
+msgid "Routing paused"
+msgstr ""
+
+#: src/app/TrayController.cpp:62
+#, kde-format
+msgid "Routing links"
+msgstr ""
+
+#: src/core/DefaultBrowserManager.cpp:113
+#, kde-format
+msgid ""
+"%1 is not in the application database yet. Install it and run kbuildsycoca6, "
+"then try again."
+msgstr ""
+
+#: src/core/DefaultBrowserManager.cpp:147
+#, kde-format
+msgid "Could not save the previous browser associations."
+msgstr ""
+
+#: src/core/DefaultBrowserManager.cpp:158
+#, kde-format
+msgid ""
+"Could not write the browser associations; the previous handlers are retained."
+msgstr ""
+
+#: src/core/DefaultBrowserManager.cpp:164
+#, kde-format
+msgid ""
+"Registered, but %1 also sets a default for http/https and takes precedence. "
+"Lob will not receive links until that entry is removed."
+msgstr ""
+
+#: src/core/DefaultBrowserManager.cpp:213
+#, kde-format
+msgid ""
+"Could not restore the browser associations; recovery information is retained."
+msgstr ""
+
+#: src/core/DefaultBrowserManager.cpp:219
+#, kde-format
+msgid ""
+"Some browser associations could not be restored. Their recovery information "
+"is retained."
+msgstr ""
+
+#: src/core/DefaultBrowserManager.cpp:220
+#, kde-format
+msgid ""
+"No previous handler was recorded; set your browser from System Settings."
+msgstr ""
+
+#: src/core/Launcher.cpp:271
+#, kde-format
+msgid "Refusing to launch %1: not a browser executable."
+msgstr ""
+
+#: src/core/Launcher.cpp:276
+#, kde-format
+msgid "%1 does not support private browsing."
+msgstr ""
+
+#: src/core/Launcher.cpp:331
+#, kde-format
+msgid "Could not launch %1 (error %2)."
+msgstr ""
+
+#: src/core/Launcher.cpp:350
+#, kde-format
+msgid "Unsupported desktop launch command for %1."
+msgstr ""
+
+#: src/core/Launcher.cpp:380
+#, kde-format
+msgid "Could not start %1."
+msgstr ""
+
+#: src/core/RuleEngine.cpp:114
+#, kde-format
+msgctxt "what a rule matches; becomes %1 of a \"<match> -> <action>\" line"
+msgid "host is %1"
+msgstr ""
+
+#: src/core/RuleEngine.cpp:117
+#, kde-format
+msgctxt "what a rule matches; becomes %1 of a \"<match> -> <action>\" line"
+msgid "host is or ends in %1"
+msgstr ""
+
+#: src/core/RuleEngine.cpp:120
+#, kde-format
+msgctxt "what a rule matches; becomes %1 of a \"<match> -> <action>\" line"
+msgid "URL starts with %1"
+msgstr ""
+
+#: src/core/RuleEngine.cpp:123
+#, kde-format
+msgctxt "what a rule matches; becomes %1 of a \"<match> -> <action>\" line"
+msgid "URL matches /%1/"
+msgstr ""
+
+#: src/core/RuleEngine.cpp:129
+#, kde-format
+msgctxt "%1 is what the rule matches"
+msgid "%1 → always ask"
+msgstr ""
+
+#: src/core/RuleEngine.cpp:131
+#, kde-format
+msgctxt "%1 is what the rule matches"
+msgid "%1 → copy instead of opening"
+msgstr ""
+
+#: src/core/RuleEngine.cpp:137
+#, kde-format
+msgctxt "%1 is what the rule matches, %2 a browser or profile id"
+msgid "%1 → open in %2 (private)"
+msgstr ""
+
+#: src/core/RuleEngine.cpp:138
+#, kde-format
+msgctxt "%1 is what the rule matches, %2 a browser or profile id"
+msgid "%1 → open in %2"
+msgstr ""
+
+#: src/core/RuleStore.cpp:247
+#, kde-format
+msgid "Cannot read rules.json; keeping the last valid configuration."
+msgstr ""
+
+#: src/core/RuleStore.cpp:259
+#, kde-format
+msgid "Invalid rules.json at byte %1; keeping the last valid configuration."
+msgstr ""
+
+#: src/core/RuleStore.cpp:274
+#, kde-format
+msgid "Cannot save until rules.json is readable and valid again."
+msgstr ""
+
+#: src/core/RuleStore.cpp:284
+#, kde-format
+msgid "Cannot create the Lob configuration directory."
+msgstr ""
+
+#: src/core/RuleStore.cpp:288
+#, kde-format
+msgid "Another process is updating rules.json; try again."
+msgstr ""
+
+#: src/core/RuleStore.cpp:294
+#, kde-format
+msgid ""
+"rules.json changed externally. Review the new configuration and try again."
+msgstr ""
+
+#: src/core/RuleStore.cpp:299
+#, kde-format
+msgid "Could not save rules.json: %1"
+msgstr ""
+
+#: src/core/UrlSanitizer.cpp:21
+#, kde-format
+msgid "Not a valid URL."
+msgstr ""
+
+#: src/core/UrlSanitizer.cpp:26
+#, kde-format
+msgid "Only http and https URLs are routed (got '%1')."
+msgstr ""
+
+#: src/core/UrlSanitizer.cpp:30
+#, kde-format
+msgid "URL has no host."
+msgstr ""
+
+#: src/core/UrlSanitizer.cpp:37
+#, kde-format
+msgid "URL contains embedded credentials."
+msgstr ""
+
+#: src/main.cpp:336
+#, kde-format
+msgid "Routes links to the right browser"
+msgstr ""
+
+#: src/ui/PickerController.cpp:85
+#, kde-format
+msgid "The browser did not report back. The link may or may not have opened."
+msgstr ""
+
+#: src/ui/PickerController.cpp:130
+#, kde-format
+msgid "Copying to clipboard"
+msgstr ""
+
+#: src/ui/PickerController.cpp:135
+#, kde-format
+msgid "Opening in %1 (private)"
+msgstr ""
+
+#: src/ui/PickerController.cpp:135
+#, kde-format
+msgid "Opening in %1"
+msgstr ""
+
+#: src/ui/PickerController.cpp:142
+#, kde-format
+msgid "matched a rule"
+msgstr ""
+
+#: src/ui/PickerController.cpp:144
+#, kde-format
+msgid "remembered for %1"
+msgstr ""
+
+#: src/ui/PickerController.cpp:146
+#, kde-format
+msgid "default target"
+msgstr ""
+
+#: src/ui/PickerController.cpp:468
+#, kde-format
+msgid ""
+"The configured browser or profile is unavailable or ambiguous. Choose a "
+"browser for this link."
+msgstr ""
+
+#: qml/Picker.qml:164
+msgid "via %1"
+msgstr ""
+
+#: qml/Picker.qml:182
+msgid "Opening browser…"
+msgstr ""
+
+#: qml/Picker.qml:237
+msgid "No browsers found. Install a browser, then refresh the list."
+msgstr ""
+
+#: qml/Picker.qml:294
+msgid "Private browsing is unavailable for this target"
+msgstr ""
+
+#: qml/Picker.qml:344
+msgid "Update what I remember for %1"
+msgstr ""
+
+#: qml/Picker.qml:345
+msgid "Remember for %1"
+msgstr ""
+
+#: qml/Picker.qml:350
+msgid "Private window"
+msgstr ""
+
+#: qml/Picker.qml:360
+msgid "Any key or click to choose a different browser"
+msgstr ""
+
+#: qml/Picker.qml:361
+msgid "1–9 pick · P private · R remember · C copy · F5 refresh · Esc cancel"
+msgstr ""

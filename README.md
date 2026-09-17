@@ -224,6 +224,21 @@ routing a link to one is useful is your call.
 - If `~/.config/kde-mimeapps.list` sets an http/https default it outranks the
   registration Lob writes; `lob --status` warns when that is the case.
 
+## Translations
+
+Every string in Lob is translatable and the catalogues are wired up, but no
+language ships yet -- English is what you get until someone writes one.
+
+```bash
+./Messages.sh                                          # refresh po/lob.pot
+msginit --input=po/lob.pot --locale=de --output=po/de/lob.po
+```
+
+Translate that file and build as usual; the catalogue is compiled and installed
+automatically, and covers the QML picker as well as the C++ side. See
+[po/README.md](po/README.md). CI checks that `po/lob.pot` still matches the
+sources, so a string added without re-running `Messages.sh` fails the build.
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE).

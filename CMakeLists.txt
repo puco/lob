@@ -30,6 +30,12 @@ find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS
 
 find_package(LayerShellQt 6.6 REQUIRED)
 
+# Translations. Messages.sh extracts po/lob.pot; a translator drops
+# po/<lang>/lob.po beside it and ki18n_install compiles and installs the
+# catalogue KLocalizedString looks up at runtime. With no .po files present it
+# installs nothing, so this is unconditional rather than guarded.
+ki18n_install(po)
+
 # The app id is load-bearing: the D-Bus name KDBusService derives from
 # organizationDomain + applicationName must equal the .desktop basename, or
 # DBusActivatable silently falls back to Exec=.
