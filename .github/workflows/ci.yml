@@ -23,7 +23,8 @@ jobs:
             kirigami kirigami-addons ki18n kcoreaddons kconfig kdbusaddons \
             knotifications kwindowsystem kiconthemes kcolorscheme kcrash \
             kstatusnotifieritem kservice kio layer-shell-qt qqc2-desktop-style \
-            appstream desktop-file-utils
+            appstream desktop-file-utils \
+            sway
 
       - uses: actions/checkout@v4
 
@@ -50,9 +51,17 @@ jobs:
         run: cmake --build build
 
       - name: Test
-        # The tests are headless by design; the GUI needs a compositor, which
-        # CI has none of, so anything requiring one is verified by hand.
+        # Everything here runs without a display. Kept as its own step so a
+        # compositor that fails to start cannot be mistaken for a broken test.
         run: ctest --test-dir build --output-on-failure
+
+      - name: Test under a compositor
+        # The layer-shell surface, the exclusive keyboard grab and being placed
+        # on an output are the parts that only exist on a compositor, and until
+        # now they were checked by hand or not at all. sway runs headless with
+        # two outputs, so the single-monitor case stops being the only one
+        # anything is ever tried on.
+        run: tests/run-under-compositor.sh --test-dir build --output-on-failure
 
       - name: Install
         run: DESTDIR="$PWD/staging" cmake --install build

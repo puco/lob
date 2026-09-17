@@ -71,6 +71,19 @@ cmake --install build
 ctest --test-dir build
 ```
 
+`ctest` runs everything that works without a display. The picker's own path --
+a layer-shell overlay holding an exclusive keyboard grab -- needs a compositor,
+and taking one over is not something a test run should do to the desktop you
+are sitting at, so those tests skip unless you ask for them:
+
+```bash
+tests/run-under-compositor.sh --test-dir build --output-on-failure
+```
+
+That starts a throwaway headless sway with two outputs, runs the tests inside
+it, and takes it down again. It needs `sway` installed, and skips cleanly if it
+is not.
+
 ## Use
 
 ```bash

@@ -46,6 +46,46 @@ private Q_SLOTS:
         if (!process.waitForFinished(2000)) { process.kill(); process.waitForFinished(); }
     }
 
+    void paintsThroughLayerShellOnACompositor()
+    {
+        // Every other test here runs on the offscreen platform with layer-shell
+        // switched off, which is the one configuration no user ever has. The
+        // real path -- a layer surface on the overlay layer holding an
+        // exclusive keyboard grab -- was covered by nothing until this, and it
+        // is the path that breaks when LayerShellQt changes under us.
+        // Gated on a compositor this suite started, not on any compositor at
+        // all: a layer surface with an exclusive keyboard grab would otherwise
+        // take over the screen and the keyboard of whoever ran ctest on their
+        // own desktop, for as long as the test takes.
+        if (qEnvironmentVariableIsEmpty("LOB_TEST_COMPOSITOR")) {
+            QSKIP("needs a disposable Wayland compositor; run tests/run-under-compositor.sh");
+        }
+
+        auto env = environment();
+        env.remove(QStringLiteral("LOB_NO_LAYERSHELL"));
+        env.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("wayland"));
+
+        QProcess process;
+        process.setProcessEnvironment(env);
+        process.setProcessChannelMode(QProcess::MergedChannels);
+        process.start(QStringLiteral(LOB_TEST_BINARY), {QStringLiteral("--pick"), QStringLiteral("https://example.com/")});
+        QVERIFY(process.waitForStarted());
+
+        QByteArray output;
+        QTRY_VERIFY2_WITH_TIMEOUT((output += process.readAll()).contains("painted in"), output.constData(), 20000);
+        QVERIFY2(!output.contains("ReferenceError") && !output.contains("TypeError")
+                 && !output.contains("failed to load component"), output.constData());
+
+        // An exclusive keyboard grab that outlives the process is a session
+        // with no keyboard, so the picker has to still be killable.
+        process.terminate();
+        if (!process.waitForFinished(5000)) {
+            process.kill();
+            process.waitForFinished();
+            QFAIL("the picker ignored SIGTERM while holding an exclusive keyboard grab");
+        }
+    }
+
     void versionAndUsageAreAnswered()
     {
         // These have to work with no display, no bus and no daemon: they are
