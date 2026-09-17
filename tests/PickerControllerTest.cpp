@@ -41,6 +41,46 @@ private Q_SLOTS:
     void initTestCase() { QVERIFY(config.isValid()); qputenv("XDG_CONFIG_HOME", config.path().toUtf8()); }
     void init() { QFile::remove(RuleStore::filePath()); }
 
+    void enablingAnOtherHandlerRefiltersWithoutRediscovering()
+    {
+        RuleStore store;
+        FakeLauncher launcher;
+        PickerController picker(&store, nullptr, &launcher);
+
+        Target browser;
+        browser.id = QStringLiteral("browser.desktop");
+        browser.storageId = browser.id;
+        browser.label = QStringLiteral("Browser");
+        browser.kind = TargetKind::Browser;
+
+        Target chat;
+        chat.id = QStringLiteral("chat.desktop");
+        chat.storageId = chat.id;
+        chat.label = QStringLiteral("Chat");
+        chat.kind = TargetKind::OtherHandler;
+
+        // Stands in for what discovery found: both exist on the system.
+        picker.setTargets({browser, chat});
+
+        // A handler that is not a browser stays hidden until it is named, and
+        // this runs off what discovery already returned -- there is no KSycoca
+        // database in a test, so a rediscovery here would empty the list and
+        // the assertions below would pass for the wrong reason.
+        picker.refreshEnabledHandlers();
+        QCOMPARE(picker.targetsModel()->rowCount(), 1);
+        // Hidden means hidden all the way: a rule naming it does not resolve
+        // either, so enabling it is what makes it routable at all.
+        QVERIFY(picker.targetById(chat.id).id.isEmpty());
+
+        QVERIFY(store.setOtherHandlerEnabled(chat.id, true));
+        picker.refreshEnabledHandlers();
+        QCOMPARE(picker.targetsModel()->rowCount(), 2);
+
+        QVERIFY(store.setOtherHandlerEnabled(chat.id, false));
+        picker.refreshEnabledHandlers();
+        QCOMPARE(picker.targetsModel()->rowCount(), 1);
+    }
+
     void repeatedSelectionCompletesOnceAndRemembersAfterSuccess()
     {
         RuleStore store;
