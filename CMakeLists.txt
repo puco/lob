@@ -116,6 +116,8 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${LOB_APP_ID}.desktop
         DESTINATION ${KDE_INSTALL_APPDIR})
 install(FILES data/${LOB_APP_ID}.metainfo.xml
         DESTINATION ${KDE_INSTALL_METAINFODIR})
+install(FILES data/icons/scalable/apps/${LOB_APP_ID}.svg
+        DESTINATION ${KDE_INSTALL_ICONDIR}/hicolor/scalable/apps)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${LOB_APP_ID}.service
         DESTINATION ${KDE_INSTALL_DBUSSERVICEDIR})
 # systemd reads user units from <libdir>/systemd/user only under a system

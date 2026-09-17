@@ -90,7 +90,7 @@ bool Controller::initialize()
     });
     connect(m_picker, &PickerController::errorOccurred, this, [](const QString &message) {
         qCWarning(LOG_CONTROLLER) << message;
-        KNotification::event(KNotification::Error, i18n("Lob"), message, QStringLiteral("internet-web-browser"));
+        KNotification::event(KNotification::Error, i18n("Lob"), message, QStringLiteral(LOB_APP_ID));
     });
     if (!m_store->lastError().isEmpty()) {
         QTimer::singleShot(0, m_picker, [this] { Q_EMIT m_picker->errorOccurred(m_store->lastError()); });
@@ -106,7 +106,7 @@ bool Controller::initialize()
             if (UrlSanitizer::isRoutable(url, &reason)) {
                 enqueue(url, QString(), true);
             } else {
-                KNotification::event(KNotification::Error, i18n("Lob"), reason, QStringLiteral("internet-web-browser"));
+                KNotification::event(KNotification::Error, i18n("Lob"), reason, QStringLiteral(LOB_APP_ID));
             }
         });
     }

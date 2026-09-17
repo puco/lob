@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <!-- Lob: one link arrives, three routes leave, one of them is chosen.
+       Drawn on Breeze's 48px grid. The fan is spread nearly the full height
+       rather than kept flat, because at 16px the three diverging lines are the
+       whole idea and a shallow fan closes up into a smudge. -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- the two routes not taken -->
+    <g stroke="#7f8c8d" stroke-width="4.5">
+      <path d="M15 24 L40 7"/>
+      <path d="M15 24 L40 41"/>
+    </g>
+    <!-- the link arriving, and the route chosen: the only one that is blue -->
+    <path d="M3 24 L36 24" stroke="#3daee9" stroke-width="5.5"/>
+  </g>
+  <!-- arrowhead, on the chosen route only -->
+  <path d="M34 17 L45 24 L34 31 Z" fill="#3daee9"/>
+  <!-- the decision point -->
+  <circle cx="15" cy="24" r="6.5" fill="#eff0f1"/>
+  <circle cx="15" cy="24" r="6.5" fill="none" stroke="#3daee9" stroke-width="4.5"/>
+</svg>
