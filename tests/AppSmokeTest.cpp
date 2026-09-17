@@ -46,6 +46,40 @@ private Q_SLOTS:
         if (!process.waitForFinished(2000)) { process.kill(); process.waitForFinished(); }
     }
 
+    void versionAndUsageAreAnswered()
+    {
+        // These have to work with no display, no bus and no daemon: they are
+        // what someone reaches for when nothing else is working.
+        const auto run = [this](const QStringList &arguments) {
+            QProcess process;
+            auto env = environment();
+            env.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("nonexistent-platform"));
+            process.setProcessEnvironment(env);
+            process.setProcessChannelMode(QProcess::SeparateChannels);
+            process.start(QStringLiteral(LOB_TEST_BINARY), arguments);
+            return process.waitForFinished(10000)
+                ? QPair<int, QByteArray>{process.exitCode(), process.readAllStandardOutput()}
+                : QPair<int, QByteArray>{-1, process.readAllStandardError()};
+        };
+
+        const auto version = run({QStringLiteral("--version")});
+        QCOMPARE(version.first, 0);
+        QCOMPARE(version.second.trimmed(), QByteArray("lob " LOB_VERSION));
+
+        for (const auto &flag : {"--help", "-h"}) {
+            const auto help = run({QString::fromLatin1(flag)});
+            QCOMPARE(help.first, 0);
+            QVERIFY2(help.second.contains("usage: lob") && help.second.contains("--explain"),
+                     help.second.constData());
+        }
+
+        // Nothing to do is a usage error, and says so even while a daemon that
+        // would otherwise have taken the call is running.
+        const auto nothing = run({});
+        QCOMPARE(nothing.first, 2);
+        QVERIFY(nothing.second.isEmpty()); // the complaint belongs on stderr
+    }
+
     void rejectedCredentialsAreNotLogged()
     {
         QProcess process;

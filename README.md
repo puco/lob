@@ -68,6 +68,7 @@ lob --set-default          # claim the handler (records what was there first)
 lob --restore-default      # put the previous browser back
 lob <url>                  # route one URL
 lob --pick <url>           # route one URL, ignoring rules
+lob --help                 # the same list, from the program itself
 ```
 
 Start the daemon at login so the picker is instant rather than paying a QML

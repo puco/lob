@@ -227,6 +227,27 @@ int runDefaultBrowser(const QString &mode)
 
 /// KDBusService hands us the inbound activation token via the environment and
 /// clears it once the signal returns, so it has to be taken synchronously --
+/// Written once and printed either to stdout on request or to stderr when the
+/// command line made no sense, so the two can never describe different programs.
+void printUsage(QTextStream &out)
+{
+    out << QStringLiteral("lob " LOB_VERSION " -- choose which browser opens each link\n"
+                          "\n"
+                          "usage: lob [--daemon] [--pick] <url>\n"
+                          "       lob --list | --explain <url> | --status | --set-default | --restore-default\n"
+                          "\n"
+                          "  <url>               route one URL: a rule decides, or the picker asks\n"
+                          "  --pick <url>        route one URL, ignoring the rules\n"
+                          "  --daemon            stay resident, so the picker opens without a delay\n"
+                          "  --list              discovered browsers, profiles and launch commands\n"
+                          "  --explain <url>     which rule decides this URL, and which ones lose\n"
+                          "  --status            who currently handles http and https\n"
+                          "  --set-default       claim the handler, recording what was there first\n"
+                          "  --restore-default   put the previous handler back\n"
+                          "  --version           print the version\n"
+                          "  --help              print this\n");
+}
+
 /// any queued call or nested event loop would lose it.
 QString takeActivationToken()
 {
@@ -251,6 +272,30 @@ int main(int argc, char *argv[])
         }
         return args;
     }();
+
+    // Answering these needs no application object at all, let alone a display,
+    // and answering them first means they work even where nothing else would.
+    if (rawArgs.contains(QStringLiteral("--version"))) {
+        QTextStream(stdout) << QStringLiteral("lob " LOB_VERSION "\n");
+        return 0;
+    }
+
+    if (rawArgs.contains(QStringLiteral("--help")) || rawArgs.contains(QStringLiteral("-h"))) {
+        QTextStream out(stdout);
+        printUsage(out);
+        return 0;
+    }
+
+    const bool daemonMode = rawArgs.contains(QStringLiteral("--daemon"));
+
+    // Nothing to route and nothing to stay running for. Decided here rather
+    // than after registering on the bus, where a running daemon would take the
+    // call and this would exit silently having said nothing.
+    if (!daemonMode && rawArgs.size() < 2) {
+        QTextStream out(stderr);
+        printUsage(out);
+        return 2;
+    }
 
     // --list is diagnostic and must work without a display, so it runs before
     // any QApplication exists.
@@ -309,14 +354,6 @@ int main(int argc, char *argv[])
     KDBusService service(KDBusService::Unique);
     if (!service.isRegistered()) {
         return 0;
-    }
-
-    const bool daemonMode = rawArgs.contains(QStringLiteral("--daemon"));
-
-    if (!daemonMode && rawArgs.size() < 2) {
-        err << "usage: lob [--daemon] [--pick] <url>\n"
-               "       lob --list | --explain <url> | --status | --set-default | --restore-default\n";
-        return 2;
     }
 
     Lob::Controller controller;

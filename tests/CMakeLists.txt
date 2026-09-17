@@ -30,7 +30,7 @@ ecm_mark_as_test(LauncherIntegrationTest)
 
 add_executable(AppSmokeTest AppSmokeTest.cpp)
 target_link_libraries(AppSmokeTest PRIVATE Qt6::Test)
-target_compile_definitions(AppSmokeTest PRIVATE LOB_TEST_BINARY="$<TARGET_FILE:lob>")
+target_compile_definitions(AppSmokeTest PRIVATE LOB_TEST_BINARY="$<TARGET_FILE:lob>" LOB_VERSION="${PROJECT_VERSION}")
 add_dependencies(AppSmokeTest lob LaunchRecorder)
 add_test(NAME AppSmokeTest COMMAND ${DBUS_RUN_SESSION} --config-file=${CMAKE_CURRENT_SOURCE_DIR}/dbus-session.conf -- $<TARGET_FILE:AppSmokeTest>)
 set_tests_properties(LauncherIntegrationTest AppSmokeTest PROPERTIES TIMEOUT 30)
