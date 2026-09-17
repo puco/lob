@@ -6,7 +6,7 @@
 # Fedora 42 and later have them.
 
 Name:           lob
-Version:        0.2
+Version:        0.3
 Release:        1%{?dist}
 Summary:        Choose which browser opens each link
 
@@ -112,5 +112,10 @@ PDFs, and refuses URLs carrying embedded credentials.
 %{_userunitdir}/lob.service
 
 %changelog
+* Thu Sep 17 2026 puco <puco@users.noreply.github.com> - 0.3-1
+- An icon of its own, rather than the generic browser icon
+- lob --forget <host> drops a remembered choice
+- Translation catalogues are installed when a translation exists
+
 * Thu Sep 17 2026 puco <puco@users.noreply.github.com> - 0.2-1
 - Initial Fedora package

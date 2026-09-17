@@ -69,6 +69,29 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.3" date="2026-09-17">
+      <description>
+        <p>Lob looks like itself now, and installs somewhere other than Arch.</p>
+        <ul>
+          <li>An icon of its own. Lob no longer borrows the generic web-browser
+          icon, which made the application for telling browsers apart the one you
+          could not tell apart.</li>
+          <li>A remembered choice can be undone. "Remember for this host" had no
+          way back short of editing rules.json by hand; "lob --forget &lt;host&gt;"
+          drops it, and "lob --explain" names the command when a memory is what
+          decided a link.</li>
+          <li>Lob can be translated. Every string is in one catalogue and a
+          translation is installed and used once someone writes one. None ships
+          yet, so English is still what you get.</li>
+          <li>A Fedora package, built and installed on every change.</li>
+          <li>A rule that could never match is refused rather than accepted. A
+          pathPrefix pattern with no path matched nothing and said nothing about
+          it; it is now reported when the file is read.</li>
+          <li>Without layer-shell, the picker opens on the screen the pointer is
+          on rather than wherever it was last shown.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.2" date="2026-09-17">
       <description>
         <p>Links now reach the browser you meant, and say so when they cannot.</p>

@@ -1,20 +1,22 @@
 # Releasing
 
 The version lives in `CMakeLists.txt` and is mirrored into
-`data/io.github.puco.lob.metainfo.xml` and `packaging/aur/lob/PKGBUILD`.
-Nothing can reference CMake from those files, so `packaging/check-version.sh`
-fails the build when they drift. CI runs it, and so does the release workflow
-before it publishes anything.
+`data/io.github.puco.lob.metainfo.xml`, `packaging/aur/lob/PKGBUILD` and
+`packaging/fedora/lob.spec`. Nothing can reference CMake from those files, so
+`packaging/check-version.sh` fails the build when they drift. CI runs it, and so
+does the release workflow before it publishes anything.
 
 ## Cutting a release
 
-1. Bump the version in the three places and confirm they agree:
+1. Bump the version in the four places and confirm they agree:
 
    ```bash
    ./packaging/check-version.sh
    ```
 
-   Add a matching `<release>` entry to the metainfo with today's date.
+   Add a matching `<release>` entry to the metainfo with today's date, and a
+   `%changelog` entry to the Fedora spec -- rpmbuild rejects a changelog whose
+   weekday does not match its date, so check the day rather than guessing it.
    Regenerate `packaging/aur/lob/.SRCINFO` with `makepkg --printsrcinfo`
    after updating the PKGBUILD. CI checks that both agree.
 
@@ -71,6 +73,25 @@ cd packaging/aur/lob && makepkg -si --noconfirm
 `.SRCINFO` must always match its `PKGBUILD`: the AUR reads the former, not the
 latter, so a stale one ships the wrong metadata. CI diffs them on every push.
 
+## Updating Fedora
+
+`packaging/fedora/lob.spec` builds in CI on every change, so a release needs
+nothing beyond the version and `%changelog` bump in step 1. Publishing to COPR
+is not yet set up -- see
+[issue #8](https://github.com/puco/lob/issues/8).
+
+To check the package locally without COPR:
+
+```bash
+version=$(sed -nE 's/^project\(lob VERSION ([0-9.]+).*/\1/p' CMakeLists.txt)
+rpmdev-setuptree
+git archive --format=tar.gz --prefix="lob-$version/" \
+    -o ~/rpmbuild/SOURCES/"lob-$version.tar.gz" HEAD
+cp packaging/fedora/lob.spec ~/rpmbuild/SPECS/
+sudo dnf builddep -y ~/rpmbuild/SPECS/lob.spec
+rpmbuild -bb ~/rpmbuild/SPECS/lob.spec
+```
+
 ## Requirements
 
 - An AUR account with your SSH key registered.
@@ -80,7 +101,16 @@ latter, so a stale one ships the wrong metadata. CI diffs them on every push.
 ## Manual reliability checks
 
 Automated tests cover persistence, target discovery, argument construction,
-request lifecycles and isolated MIME associations. Before shipping, verify the
+request lifecycles and isolated MIME associations. Since 0.3 they also cover the
+layer-shell surface itself, on a headless compositor:
+
+```bash
+tests/run-under-compositor.sh --test-dir build --output-on-failure
+```
+
+That does not replace the list below. It proves the overlay maps, paints and
+gives up its keyboard grab; it says nothing about real browsers, real profiles,
+focus, scaling or a second monitor. Before shipping, verify the
 compositor/browser interactions on an actual Plasma session:
 
 - Wayland: picker and hold-bar launches focus the browser, including an already

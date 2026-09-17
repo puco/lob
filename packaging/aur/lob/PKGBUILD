@@ -1,6 +1,6 @@
 # Maintainer: puco <2155990+puco@users.noreply.github.com>
 pkgname=lob
-pkgver=0.2
+pkgver=0.3
 pkgrel=1
 pkgdesc="Choose which browser opens each link"
 arch=('x86_64')
