@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Launcher.h"
+#include "core/RedirectUnwrapper.h"
 #include "core/Rule.h"
 #include "core/Target.h"
 
@@ -27,6 +28,7 @@ class PickerController : public QObject
     Q_PROPERTY(QAbstractItemModel *targets READ targetsModel CONSTANT)
     Q_PROPERTY(QString url READ url NOTIFY contextChanged)
     Q_PROPERTY(QString displayHost READ displayHost NOTIFY contextChanged)
+    Q_PROPERTY(QString wrapperHost READ wrapperHost NOTIFY contextChanged)
     Q_PROPERTY(Mode mode READ mode NOTIFY contextChanged)
     Q_PROPERTY(bool holding READ isHolding NOTIFY contextChanged)
     Q_PROPERTY(QString holdTitle READ holdTitle NOTIFY contextChanged)
@@ -56,6 +58,11 @@ public:
     QAbstractItemModel *targetsModel() const;
     QString url() const;
     QString displayHost() const;
+
+    /// Host of the redirector this link arrived through, empty if there was
+    /// none. The picker says so, because a destination that is not the URL
+    /// that was clicked is otherwise a surprise.
+    QString wrapperHost() const;
     Mode mode() const;
     bool isHolding() const;
     QString holdTitle() const;
@@ -80,13 +87,13 @@ public:
     /// before profile ids existed.
     Target targetById(const QString &id, bool remembered = false) const;
 
-    /// Asks which target should open @p url.
-    void showPicker(const QUrl &url, const QString &activationToken);
+    /// Asks which target should open @p link.
+    void showPicker(const Link &link, const QString &activationToken);
 
     /// Shows the countdown for an already-made decision, so it can be caught.
-    void showHold(const QUrl &url, const QString &activationToken, const Decision &decision);
+    void showHold(const Link &link, const QString &activationToken, const Decision &decision);
 
-    bool launchFallback(const QUrl &url, const QString &activationToken, const QString &targetId);
+    bool launchFallback(const Link &link, const QString &activationToken, const QString &targetId);
 
     Q_INVOKABLE void choose(int index, bool privateWindow, bool remember);
     Q_INVOKABLE void copyUrl();
@@ -110,7 +117,7 @@ private:
     void hidePicker();
     void checkHeldModifiers();
     void runDecision();
-    void begin(const QUrl &url, const QString &activationToken);
+    void begin(const Link &link, const QString &activationToken);
     void startLaunch(const Target &target, bool privateWindow, bool remember);
     void finish();
     void watchdogExpired();
@@ -123,7 +130,7 @@ private:
     QWindow *m_window = nullptr;
 
     QList<Target> m_targets; // everything discovered; the model lists a subset
-    QUrl m_url;
+    Link m_link;
     Mode m_mode = Mode::Idle;
     Decision m_decision;
     QElapsedTimer m_showTimer;

@@ -13,9 +13,11 @@ class FakeLauncher : public Launcher
 public:
     QList<Completion> callbacks;
     QList<QSharedPointer<LaunchOperation>> operations;
-    void launch(const Target &, const QUrl &, bool, QWindow *, Completion done,
+    QList<QUrl> urls;
+    void launch(const Target &, const QUrl &url, bool, QWindow *, Completion done,
                 const QString &, QSharedPointer<LaunchOperation> operation) override
     {
+        urls.append(url);
         callbacks.append(done);
         operations.append(operation);
     }
@@ -46,7 +48,7 @@ private Q_SLOTS:
         PickerController picker(&store, nullptr, &launcher);
         populate(picker);
         QSignalSpy finished(&picker, &PickerController::finished);
-        picker.showPicker(url, {});
+        picker.showPicker(Link::plain(url), {});
         picker.choose(0, false, true);
         picker.choose(0, false, true);
         QCOMPARE(launcher.callbacks.size(), 1);
@@ -65,7 +67,7 @@ private Q_SLOTS:
         PickerController picker(&store, nullptr, &launcher);
         populate(picker);
         QSignalSpy finished(&picker, &PickerController::finished);
-        picker.showPicker(url, {});
+        picker.showPicker(Link::plain(url), {});
         picker.choose(0, false, true);
         launcher.callbacks[0]({LaunchResult::Failed, QStringLiteral("failed")});
         QCOMPARE(picker.mode(), PickerController::Mode::Picker);
@@ -87,12 +89,12 @@ private Q_SLOTS:
         PickerController picker(&store, nullptr, &launcher);
         populate(picker);
         QSignalSpy finished(&picker, &PickerController::finished);
-        picker.showPicker(url, {});
+        picker.showPicker(Link::plain(url), {});
         picker.choose(0, false, false);
         picker.cancel();
         QVERIFY(launcher.operations[0]->cancelled);
         QCOMPARE(finished.count(), 1);
-        picker.showPicker(QUrl(QStringLiteral("https://next.example/")), {});
+        picker.showPicker(Link::plain(QUrl(QStringLiteral("https://next.example/"))), {});
         launcher.callbacks[0]({LaunchResult::Cancelled, {}});
         QCOMPARE(finished.count(), 1);
         QCOMPARE(picker.mode(), PickerController::Mode::Picker);
@@ -114,7 +116,7 @@ private Q_SLOTS:
         decision.action = RuleAction::Open;
         decision.targetId = QStringLiteral("missing");
         QSignalSpy finished(&picker, &PickerController::finished);
-        picker.showHold(url, {}, decision);
+        picker.showHold(Link::plain(url), {}, decision);
         QCOMPARE(picker.mode(), PickerController::Mode::Picker);
         QCOMPARE(finished.count(), 0);
     }
@@ -135,7 +137,7 @@ private Q_SLOTS:
         second.id += QStringLiteral("#two");
         second.profileKey = QStringLiteral("two");
         picker.setTargets({base, first, second});
-        picker.showHold(url, {}, RuleEngine::decide(url, store.rules()));
+        picker.showHold(Link::plain(url), {}, RuleEngine::decide(url, store.rules()));
         QCOMPARE(launcher.callbacks.size(), 1);
         QCOMPARE(picker.mode(), PickerController::Mode::Launching);
     }
@@ -150,14 +152,14 @@ private Q_SLOTS:
         Decision decision;
         decision.action = RuleAction::Open;
         decision.targetId = QStringLiteral("test.desktop#profile");
-        picker.showHold(url, {}, decision);
+        picker.showHold(Link::plain(url), {}, decision);
         picker.interruptHold();
         QTest::qWait(50);
         QVERIFY(launcher.callbacks.isEmpty());
         picker.cancel();
         QTest::qWait(150);
         QSignalSpy finished(&picker, &PickerController::finished);
-        picker.showPicker(url, {});
+        picker.showPicker(Link::plain(url), {});
         QTest::qWait(150); // the previous request's watchdog would have fired
         QCOMPARE(finished.count(), 0);
         QTRY_COMPARE(finished.count(), 1);
@@ -170,7 +172,7 @@ private Q_SLOTS:
         PickerController picker(&store, nullptr, &launcher, 30);
         populate(picker);
         QSignalSpy finished(&picker, &PickerController::finished);
-        picker.showPicker(url, {});
+        picker.showPicker(Link::plain(url), {});
         picker.choose(0, false, false);
         launcher.operations[0]->dispatched = true;
         QTest::qWait(60);
@@ -178,6 +180,30 @@ private Q_SLOTS:
         QCOMPARE(finished.count(), 0);
         launcher.callbacks[0]({});
         QCOMPARE(finished.count(), 1);
+    }
+
+    void aScannedLinkOpensTheScannerAndRemembersWhereItGoes()
+    {
+        // The browser gets the URL that has to be visited; the question asked,
+        // and the answer written down, are about where that link leads.
+        RuleStore store;
+        FakeLauncher launcher;
+        PickerController picker(&store, nullptr, &launcher);
+        populate(picker);
+        const QUrl scanner(QStringLiteral("https://eu01.safelinks.protection.outlook.com/?url=x"));
+        const Link link{QUrl(QStringLiteral("https://github.com/anthropics")), scanner,
+                        QStringLiteral("eu01.safelinks.protection.outlook.com")};
+
+        picker.showPicker(link, {});
+        QCOMPARE(picker.displayHost(), QStringLiteral("github.com"));
+        QCOMPARE(picker.wrapperHost(), QStringLiteral("eu01.safelinks.protection.outlook.com"));
+
+        picker.choose(0, false, true);
+        QCOMPARE(launcher.urls.size(), 1);
+        QCOMPARE(launcher.urls.constFirst(), scanner);
+        launcher.callbacks[0]({});
+        QVERIFY(store.hasMemory(QStringLiteral("github.com")));
+        QVERIFY(!store.hasMemory(QStringLiteral("eu01.safelinks.protection.outlook.com")));
     }
 
     void aDispatchThatNeverReportsBackIsEventuallyGivenUpOn()
@@ -190,7 +216,7 @@ private Q_SLOTS:
         populate(picker);
         QSignalSpy finished(&picker, &PickerController::finished);
         QSignalSpy errors(&picker, &PickerController::errorOccurred);
-        picker.showPicker(url, {});
+        picker.showPicker(Link::plain(url), {});
         picker.choose(0, false, false);
         launcher.operations[0]->dispatched = true;
 

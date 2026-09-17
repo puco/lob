@@ -1,6 +1,7 @@
 #include "app/Controller.h"
 #include "core/DefaultBrowserManager.h"
 #include "core/Launcher.h"
+#include "core/RedirectUnwrapper.h"
 #include "core/RuleEngine.h"
 #include "core/RuleStore.h"
 #include "core/Startup.h"
@@ -121,17 +122,26 @@ int runExplain(const QString &rawUrl)
     Lob::RuleStore store;
     const auto rules = store.rules();
 
-    // Routing strips tracking parameters before the rules ever see the URL, so
-    // explaining the raw one would answer a question nobody asked -- and would
-    // differ from what actually happens for any rule matching on the query.
+    // Routing reads redirectors and strips tracking parameters before the rules
+    // ever see the URL, so explaining the raw one would answer a question
+    // nobody asked -- and would differ from what actually happens.
+    const Lob::Link link = store.unwrapRedirects()
+        ? Lob::RedirectUnwrapper::unwrap(url, store.redirectWrappers())
+        : Lob::Link::plain(url);
     const QUrl routed = store.stripTracking()
-        ? Lob::UrlSanitizer::strip(url, store.trackingParameters())
-        : url;
+        ? Lob::UrlSanitizer::strip(link.destination, store.trackingParameters())
+        : link.destination;
 
     const Lob::Decision decision = Lob::RuleEngine::decide(routed, rules, store.fallbackTargetId());
 
     out << "url:   " << url.toString() << '\n';
-    if (routed != url) {
+    if (link.wasWrapped()) {
+        out << "       -> " << link.destination.toString() << " (unwrapped from " << link.wrapper << ")\n";
+        if (link.toOpen != link.destination) {
+            out << "       the browser still receives the " << link.toOpen.host() << " URL, which is there to be visited\n";
+        }
+    }
+    if (routed != link.destination) {
         out << "       -> " << routed.toString() << " (tracking parameters stripped)\n";
     }
     out << "host:  " << routed.host() << '\n';

@@ -98,12 +98,17 @@ QAbstractItemModel *PickerController::targetsModel() const
 
 QString PickerController::url() const
 {
-    return m_url.toString();
+    return m_link.destination.toString();
 }
 
 QString PickerController::displayHost() const
 {
-    return m_url.host();
+    return m_link.destination.host();
+}
+
+QString PickerController::wrapperHost() const
+{
+    return m_link.wrapper;
 }
 
 PickerController::Mode PickerController::mode() const
@@ -136,7 +141,7 @@ QString PickerController::holdReason() const
     case Decision::Source::Rule:
         return i18n("matched a rule");
     case Decision::Source::Memory:
-        return i18n("remembered for %1", m_url.host());
+        return i18n("remembered for %1", m_link.destination.host());
     case Decision::Source::Fallback:
         return i18n("default target");
     case Decision::Source::Ask:
@@ -152,7 +157,7 @@ int PickerController::holdMs() const
 
 bool PickerController::isRemembered() const
 {
-    return m_store && m_store->hasMemory(m_url.host());
+    return m_store && m_store->hasMemory(m_link.destination.host());
 }
 
 bool PickerController::hasTargets() const
@@ -307,17 +312,17 @@ bool PickerController::ensureWindow(QQmlApplicationEngine *engine)
     return true;
 }
 
-void PickerController::showPicker(const QUrl &url, const QString &activationToken)
+void PickerController::showPicker(const Link &link, const QString &activationToken)
 {
-    begin(url, activationToken);
+    begin(link, activationToken);
     m_mode = Mode::Picker;
     m_decision = {};
     present(activationToken);
 }
 
-void PickerController::showHold(const QUrl &url, const QString &activationToken, const Decision &decision)
+void PickerController::showHold(const Link &link, const QString &activationToken, const Decision &decision)
 {
-    begin(url, activationToken);
+    begin(link, activationToken);
     m_decision = decision;
 
     // A zero hold is a deliberate "stop asking me": carry it out at once rather
@@ -350,7 +355,7 @@ void PickerController::showHold(const QUrl &url, const QString &activationToken,
     }
 }
 
-void PickerController::begin(const QUrl &url, const QString &activationToken)
+void PickerController::begin(const Link &link, const QString &activationToken)
 {
     ++m_requestId;
     m_holdTimer.stop();
@@ -361,7 +366,7 @@ void PickerController::begin(const QUrl &url, const QString &activationToken)
     m_operation.clear();
     m_error.clear();
     setCurrentIndex(0);
-    m_url = url;
+    m_link = link;
     m_activationToken = activationToken;
 }
 
@@ -447,7 +452,7 @@ void PickerController::runDecision()
     if (m_decision.action == RuleAction::Copy) {
         // Controller keeps even a one-shot process alive while it owns the
         // selection, so the clipboard can still serve the URL after dismissal.
-        QGuiApplication::clipboard()->setText(m_url.toString());
+        QGuiApplication::clipboard()->setText(m_link.destination.toString());
         Q_EMIT clipboardCopied();
         qCDebug(LOG_PICKER) << "copied URL to clipboard";
         finish();
@@ -475,11 +480,11 @@ bool PickerController::decisionPredatesProfileIds() const
     return m_decision.source == Decision::Source::Memory && m_decision.legacyTarget;
 }
 
-bool PickerController::launchFallback(const QUrl &url, const QString &activationToken, const QString &targetId)
+bool PickerController::launchFallback(const Link &link, const QString &activationToken, const QString &targetId)
 {
     const Target target = targetById(targetId);
     if (target.id.isEmpty() || target.kind != TargetKind::Browser) { return false; }
-    begin(url, activationToken);
+    begin(link, activationToken);
     startLaunch(target, false, false);
     return true;
 }
@@ -505,10 +510,13 @@ void PickerController::startLaunch(const Target &target, bool privateWindow, boo
     m_mode = Mode::Launching;
     Q_EMIT contextChanged();
     const auto id = ++m_requestId;
-    const QString host = m_url.host();
+    const QString host = m_link.destination.host();
     m_operation = QSharedPointer<LaunchOperation>::create();
     QPointer<PickerController> guard(this);
-    m_launcher->launch(target, m_url, privateWindow, m_window,
+    // The browser is handed toOpen: the same URL, unless a link scanner was
+    // read through, in which case it is the scanner's own URL that must be
+    // visited even though the decision was made about where it leads.
+    m_launcher->launch(target, m_link.toOpen, privateWindow, m_window,
         [guard, id, target, host, privateWindow, remember](LaunchResult result) {
             if (!guard || guard->m_requestId != id || guard->m_mode != Mode::Launching) {
                 return;
@@ -543,7 +551,7 @@ void PickerController::finish()
 void PickerController::copyUrl()
 {
     if (m_mode != Mode::Picker) { return; }
-    QGuiApplication::clipboard()->setText(m_url.toString());
+    QGuiApplication::clipboard()->setText(m_link.destination.toString());
     Q_EMIT clipboardCopied();
     finish();
 }

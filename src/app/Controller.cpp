@@ -150,16 +150,32 @@ void Controller::handleUrls(const QList<QUrl> &urls, const QString &activationTo
 void Controller::enqueue(const QUrl &rawUrl, const QString &token, bool forcePicker)
 {
     m_acceptedAnyUrl = true;
-    // Strip before the rules see it, so a rule matching on query parameters
-    // matches what will actually be opened rather than what arrived.
-    const QUrl url = m_store->stripTracking()
-        ? UrlSanitizer::strip(rawUrl, m_store->trackingParameters())
-        : rawUrl;
-    if (url != rawUrl) {
-        qCDebug(LOG_CONTROLLER) << "stripped tracking parameters for host" << url.host();
+
+    // A link clicked in a chat client or a search result arrives wrapped in a
+    // redirector, so read it through to where it actually goes first: asking
+    // about the redirector, and remembering it, would answer a question about
+    // a host that every other link goes through too.
+    Link link = m_store->unwrapRedirects() ? RedirectUnwrapper::unwrap(rawUrl, m_store->redirectWrappers())
+                                           : Link::plain(rawUrl);
+    if (link.wasWrapped()) {
+        qCDebug(LOG_CONTROLLER) << "unwrapped a link from" << link.wrapper << "to host" << link.destination.host();
     }
 
-    m_queue.enqueue({url, token, forcePicker});
+    // Strip before the rules see it, so a rule matching on query parameters
+    // matches what will actually be opened rather than what arrived.
+    if (m_store->stripTracking()) {
+        const QStringList patterns = m_store->trackingParameters();
+        const QUrl destination = UrlSanitizer::strip(link.destination, patterns);
+        if (destination != link.destination) {
+            qCDebug(LOG_CONTROLLER) << "stripped tracking parameters for host" << destination.host();
+        }
+        // The two are the same URL unless a link scanner is being left intact,
+        // and that one has to keep the parameters it was given.
+        link.toOpen = link.toOpen == link.destination ? destination : link.toOpen;
+        link.destination = destination;
+    }
+
+    m_queue.enqueue({link, token, forcePicker});
     processQueue();
 }
 
@@ -177,24 +193,25 @@ void Controller::processQueue()
     // the configured fallback, else whatever handled links before we did. Only
     // if neither exists is asking better than dropping the link.
     if (m_tray && m_tray->isPaused() && !pending.forcePicker) {
-        if (m_picker->launchFallback(pending.url, pending.token, m_store->fallbackTargetId())
-            || m_picker->launchFallback(pending.url, pending.token, DefaultBrowserManager::previousHandler(pending.url.scheme()))) {
+        const QString previous = DefaultBrowserManager::previousHandler(pending.link.destination.scheme());
+        if (m_picker->launchFallback(pending.link, pending.token, m_store->fallbackTargetId())
+            || m_picker->launchFallback(pending.link, pending.token, previous)) {
             return;
         }
-        m_picker->showPicker(pending.url, pending.token);
+        m_picker->showPicker(pending.link, pending.token);
         return;
     }
 
     if (pending.forcePicker) {
-        m_picker->showPicker(pending.url, pending.token);
+        m_picker->showPicker(pending.link, pending.token);
         return;
     }
 
-    const Decision decision = RuleEngine::decide(pending.url, m_store->rules(), m_store->fallbackTargetId());
+    const Decision decision = RuleEngine::decide(pending.link.destination, m_store->rules(), m_store->fallbackTargetId());
     if (decision.opensWithoutAsking()) {
-        m_picker->showHold(pending.url, pending.token, decision);
+        m_picker->showHold(pending.link, pending.token, decision);
     } else {
-        m_picker->showPicker(pending.url, pending.token);
+        m_picker->showPicker(pending.link, pending.token);
     }
 }
 

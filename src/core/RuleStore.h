@@ -6,6 +6,7 @@
 #include <QObject>
 #include <QString>
 #include <QJsonObject>
+#include <QMap>
 #include <QTimer>
 
 class QFileSystemWatcher;
@@ -55,6 +56,13 @@ public:
     /// Parameter patterns to strip; "*" suffix matches by prefix.
     QStringList trackingParameters() const;
 
+    /// Whether a link that arrives wrapped in a redirector is read through to
+    /// where it actually goes before anything is decided about it.
+    bool unwrapRedirects() const;
+
+    /// Redirectors beyond the built-in ones: "host[/path]" -> query parameter.
+    QMap<QString, QString> redirectWrappers() const;
+
     /// Ids of "other handler" targets the user has explicitly enabled.
     QStringList enabledOtherHandlers() const;
     bool setOtherHandlerEnabled(const QString &targetId, bool enabled);
@@ -74,6 +82,8 @@ private:
     int m_holdMs = 600;
     bool m_stripTracking = true;
     QStringList m_trackingParameters;
+    bool m_unwrapRedirects = true;
+    QMap<QString, QString> m_redirectWrappers;
     QStringList m_enabledOtherHandlers;
     QFileSystemWatcher *m_watcher;
     QTimer m_reloadTimer;

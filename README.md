@@ -113,6 +113,39 @@ This works because a Wayland client can see which keys were already held when
 it takes keyboard focus, which is the only moment the gesture is observable --
 the modifier is held in the application that opened the link, not in Lob.
 
+### Redirects
+
+A link clicked in Slack, a search result or a mail client usually arrives as a
+redirector's URL rather than the page it points at. Lob reads the destination
+out of it before deciding anything, so the picker asks about the page, a rule
+matches on it, and **remember for this host** records it — rather than recording
+`slack.com`, which every link from Slack would then match.
+
+Only redirectors that carry their destination in the URL are read, and reading
+them costs nothing: no request is made, so the tracker never hears from Lob.
+Known ones include Slack, Google and DuckDuckGo result links, Reddit, Facebook,
+Instagram, YouTube, LinkedIn, Steam, VK, Tumblr and Outlook SafeLinks. The
+picker shows the destination with a `via <host>` line, so a URL that is not the
+one you clicked is never a surprise.
+
+Link scanners are the exception to opening what was read. A SafeLinks URL exists
+to be visited — that is where the scan happens — so Lob routes by the
+destination but still hands the browser the scanner's URL. Everything else opens
+as the destination, which leaves the click-tracker out of it entirely.
+
+Shorteners (`t.co`, `bit.ly`, `lnkd.in`) keep their destination on their own
+server, so there is nothing to read without asking them. Those links are routed
+as-is and the browser follows the redirect as before.
+
+Add a redirector Lob does not know with `redirectWrappers`, mapping
+`host` or `host/path` to the query parameter holding the destination:
+
+```json
+"redirectWrappers": { "go.corp.example/out": "to" }
+```
+
+Set `"unwrapRedirects": false` to switch all of this off.
+
 ## Configuration
 
 `~/.config/lob/rules.json`, watched, so edits apply without a restart. A

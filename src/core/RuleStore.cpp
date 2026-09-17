@@ -37,8 +37,22 @@ bool validate(const QJsonObject &root, QList<Rule> &rules, QString &error)
             return bad(QStringLiteral("holdMs (integer from 0 to 60000)"));
         }
     }
-    if (root.contains(QStringLiteral("stripTracking")) && !root.value(QStringLiteral("stripTracking")).isBool()) {
-        return bad(QStringLiteral("stripTracking"));
+    for (const auto &key : {QStringLiteral("stripTracking"), QStringLiteral("unwrapRedirects")}) {
+        if (root.contains(key) && !root.value(key).isBool()) {
+            return bad(key);
+        }
+    }
+    if (root.contains(QStringLiteral("redirectWrappers"))) {
+        const auto value = root.value(QStringLiteral("redirectWrappers"));
+        if (!value.isObject()) {
+            return bad(QStringLiteral("redirectWrappers (\"host[/path]\": \"parameter\")"));
+        }
+        const auto wrappers = value.toObject();
+        for (auto it = wrappers.constBegin(); it != wrappers.constEnd(); ++it) {
+            if (it.key().isEmpty() || !it.value().isString() || it.value().toString().isEmpty()) {
+                return bad(QStringLiteral("redirectWrappers.") + it.key());
+            }
+        }
     }
     if (root.contains(QStringLiteral("fallbackTarget")) && !root.value(QStringLiteral("fallbackTarget")).isString()) {
         return bad(QStringLiteral("fallbackTarget"));
@@ -199,6 +213,12 @@ void RuleStore::apply(const QJsonObject &root, const QList<Rule> &rules)
     m_trackingParameters = root.contains(QStringLiteral("trackingParameters"))
         ? strings(root.value(QStringLiteral("trackingParameters"))) : UrlSanitizer::defaultTrackingParameters();
     m_enabledOtherHandlers = strings(root.value(QStringLiteral("enabledOtherHandlers")));
+    m_unwrapRedirects = root.value(QStringLiteral("unwrapRedirects")).toBool(true);
+    m_redirectWrappers.clear();
+    const auto wrappers = root.value(QStringLiteral("redirectWrappers")).toObject();
+    for (auto it = wrappers.constBegin(); it != wrappers.constEnd(); ++it) {
+        m_redirectWrappers.insert(it.key(), it.value().toString());
+    }
     m_writable = true;
     m_error.clear();
     Q_EMIT changed();
@@ -325,6 +345,8 @@ QString RuleStore::fallbackTargetId() const { return m_fallbackTargetId; }
 int RuleStore::holdMs() const { return m_holdMs; }
 bool RuleStore::stripTracking() const { return m_stripTracking; }
 QStringList RuleStore::trackingParameters() const { return m_trackingParameters; }
+bool RuleStore::unwrapRedirects() const { return m_unwrapRedirects; }
+QMap<QString, QString> RuleStore::redirectWrappers() const { return m_redirectWrappers; }
 QStringList RuleStore::enabledOtherHandlers() const { return m_enabledOtherHandlers; }
 
 bool RuleStore::setFallbackTargetId(const QString &id)

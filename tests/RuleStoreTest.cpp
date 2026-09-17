@@ -198,6 +198,22 @@ private Q_SLOTS:
         QTRY_COMPARE(store.holdMs(), 789);
     }
 
+    void redirectSettingsAreReadAndValidated()
+    {
+        RuleStore store;
+        QVERIFY(store.unwrapRedirects()); // on unless it is turned off
+        QVERIFY(store.redirectWrappers().isEmpty());
+
+        writeConfig("{\"unwrapRedirects\":false,\"redirectWrappers\":{\"go.corp.example/out\":\"to\"}}");
+        QTRY_VERIFY(!store.unwrapRedirects());
+        QCOMPARE(store.redirectWrappers().value(QStringLiteral("go.corp.example/out")), QStringLiteral("to"));
+
+        writeConfig("{\"redirectWrappers\":{\"go.corp.example\":true}}");
+        QTRY_VERIFY(store.lastError().contains(QLatin1String("redirectWrappers")));
+        // The last valid configuration is still the one in force.
+        QCOMPARE(store.redirectWrappers().value(QStringLiteral("go.corp.example/out")), QStringLiteral("to"));
+    }
+
     void deletingTheFileIsAResetRatherThanAnError()
     {
         // Removing rules.json is how someone starts over. Treating it as a

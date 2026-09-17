@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/RedirectUnwrapper.h"
+
 #include <QObject>
 #include <QQueue>
 #include <QString>
@@ -51,7 +53,7 @@ public:
 
 private:
     struct PendingUrl {
-        QUrl url;
+        Link link;
         QString token;
         bool forcePicker = false;
     };

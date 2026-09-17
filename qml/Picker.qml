@@ -148,6 +148,20 @@ Window {
                 elide: Text.ElideMiddle
             }
 
+            // The URL above is where the link goes, which is not the URL that
+            // was clicked when something wrapped it. Say so rather than leaving
+            // the difference to be noticed.
+            QQC2.Label {
+                Layout.fillWidth: true
+                Layout.topMargin: -Kirigami.Units.smallSpacing
+                horizontalAlignment: Text.AlignHCenter
+                visible: picker.wrapperHost !== ""
+                text: i18n("via %1", picker.wrapperHost)
+                textFormat: Text.PlainText
+                opacity: 0.5
+                elide: Text.ElideMiddle
+            }
+
             // ---- Hold: a decision already made, shown so it can be caught ----
             QQC2.Label {
                 Layout.fillWidth: true

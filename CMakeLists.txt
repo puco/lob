@@ -41,6 +41,7 @@ add_library(lobcore STATIC
     src/core/BrowserProfiles.cpp
     src/core/DefaultBrowserManager.cpp
     src/core/Launcher.cpp
+    src/core/RedirectUnwrapper.cpp
     src/core/RuleEngine.cpp
     src/core/RuleStore.cpp
     src/core/Startup.cpp
