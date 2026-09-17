@@ -40,6 +40,19 @@ jobs:
           ./Messages.sh
           git diff --exit-code po/lob.pot
 
+      - name: Check the catalogues
+        # A translation that drops a placeholder is a runtime bug, not a typo:
+        # "Could not launch %1 (error %2)." without its %2 reaches users as a
+        # broken message in that language only. --check-format is what notices,
+        # and nothing else in the build would.
+        run: |
+          status=0
+          for po in po/*/lob.po; do
+            echo "== $po"
+            msgfmt -c --check-format --statistics -o /dev/null "$po" || status=1
+          done
+          exit $status
+
       - name: Configure
         run: |
           cmake -B build -G Ninja \

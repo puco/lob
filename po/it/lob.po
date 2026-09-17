@@ -1,489 +1,492 @@
-# SOME DESCRIPTIVE TITLE.
-# Copyright (C) YEAR Lob contributors
+# Italian translation for Lob.
+# Copyright (C) 2026 Lob contributors
 # This file is distributed under the same license as the lob package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
 #
-#, fuzzy
+# Produced with machine assistance and NOT reviewed by a native speaker.
+# Corrections are welcome and expected; see po/README.md.
+#
 msgid ""
 msgstr ""
 "Project-Id-Version: lob\n"
 "Report-Msgid-Bugs-To: https://github.com/puco/lob/issues\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language-Team: LANGUAGE <LL@li.org>\n"
-"Language: \n"
+"PO-Revision-Date: 2026-09-17 00:00+0000\n"
+"Last-Translator: unreviewed machine-assisted translation <https://github.com/puco/lob/issues>\n"
+"Language-Team: Italian\n"
+"Language: it\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: src/app/Controller.cpp src/app/TrayController.cpp src/main.cpp
 #, kde-format
 msgid "Lob"
-msgstr ""
+msgstr "Lob"
 
 #: src/app/TrayController.cpp
 #, kde-format
 msgid "Open Link in Clipboard…"
-msgstr ""
+msgstr "Apri il collegamento negli appunti…"
 
 #: src/app/TrayController.cpp
 #, kde-format
 msgid "Configure Lob…"
-msgstr ""
+msgstr "Configura Lob…"
 
 #: src/app/TrayController.cpp
 #, kde-format
 msgid "Pause Routing"
-msgstr ""
+msgstr "Sospendi l'instradamento"
 
 #: src/app/TrayController.cpp
 #, kde-format
 msgid "Quit"
-msgstr ""
+msgstr "Esci"
 
 #: src/app/TrayController.cpp
 #, kde-format
 msgid "Routing paused"
-msgstr ""
+msgstr "Instradamento sospeso"
 
 #: src/app/TrayController.cpp
 #, kde-format
 msgid "Routing links"
-msgstr ""
+msgstr "Instradamento dei collegamenti"
 
 #: src/core/DefaultBrowserManager.cpp
 #, kde-format
 msgid ""
 "%1 is not in the application database yet. Install it and run kbuildsycoca6, "
 "then try again."
-msgstr ""
+msgstr "%1 non è ancora nella banca dati delle applicazioni. Installalo, esegui kbuildsycoca6 e riprova."
 
 #: src/core/DefaultBrowserManager.cpp
 #, kde-format
 msgid "Could not save the previous browser associations."
-msgstr ""
+msgstr "Impossibile salvare le associazioni precedenti del browser."
 
 #: src/core/DefaultBrowserManager.cpp
 #, kde-format
 msgid ""
 "Could not write the browser associations; the previous handlers are retained."
-msgstr ""
+msgstr "Impossibile scrivere le associazioni del browser; i gestori precedenti sono stati mantenuti."
 
 #: src/core/DefaultBrowserManager.cpp
 #, kde-format
 msgid ""
 "Registered, but %1 also sets a default for http/https and takes precedence. "
 "Lob will not receive links until that entry is removed."
-msgstr ""
+msgstr "Registrato, ma anche %1 imposta un valore predefinito per http/https e ha la precedenza. Lob non riceverà collegamenti finché quella voce non sarà rimossa."
 
 #: src/core/DefaultBrowserManager.cpp
 #, kde-format
 msgid ""
 "Could not restore the browser associations; recovery information is retained."
-msgstr ""
+msgstr "Impossibile ripristinare le associazioni del browser; le informazioni di ripristino sono state mantenute."
 
 #: src/core/DefaultBrowserManager.cpp
 #, kde-format
 msgid ""
 "Some browser associations could not be restored. Their recovery information "
 "is retained."
-msgstr ""
+msgstr "Alcune associazioni del browser non sono state ripristinate. Le relative informazioni di ripristino sono state mantenute."
 
 #: src/core/DefaultBrowserManager.cpp
 #, kde-format
 msgid ""
 "No previous handler was recorded; set your browser from System Settings."
-msgstr ""
+msgstr "Non è stato registrato alcun gestore precedente; imposta il browser dalle Impostazioni di sistema."
 
 #: src/core/Launcher.cpp
 #, kde-format
 msgid "Refusing to launch %1: not a browser executable."
-msgstr ""
+msgstr "Avvio di %1 rifiutato: non è un eseguibile di un browser."
 
 #: src/core/Launcher.cpp
 #, kde-format
 msgid "%1 does not support private browsing."
-msgstr ""
+msgstr "%1 non supporta la navigazione privata."
 
 #: src/core/Launcher.cpp
 #, kde-format
 msgid "Could not launch %1 (error %2)."
-msgstr ""
+msgstr "Impossibile avviare %1 (errore %2)."
 
 #: src/core/Launcher.cpp
 #, kde-format
 msgid "Unsupported desktop launch command for %1."
-msgstr ""
+msgstr "Comando di avvio non supportato per %1."
 
 #: src/core/Launcher.cpp
 #, kde-format
 msgid "Could not start %1."
-msgstr ""
+msgstr "Impossibile avviare %1."
 
 #: src/core/RuleEngine.cpp
 #, kde-format
 msgctxt "what a rule matches; becomes %1 of a \"<match> -> <action>\" line"
 msgid "host is %1"
-msgstr ""
+msgstr "l'host è %1"
 
 #: src/core/RuleEngine.cpp
 #, kde-format
 msgctxt "what a rule matches; becomes %1 of a \"<match> -> <action>\" line"
 msgid "host is or ends in %1"
-msgstr ""
+msgstr "l'host è %1 o un suo sottodominio"
 
 #: src/core/RuleEngine.cpp
 #, kde-format
 msgctxt "what a rule matches; becomes %1 of a \"<match> -> <action>\" line"
 msgid "URL starts with %1"
-msgstr ""
+msgstr "l'URL inizia con %1"
 
 #: src/core/RuleEngine.cpp
 #, kde-format
 msgctxt "what a rule matches; becomes %1 of a \"<match> -> <action>\" line"
 msgid "URL matches /%1/"
-msgstr ""
+msgstr "l'URL corrisponde a /%1/"
 
 #: src/core/RuleEngine.cpp
 #, kde-format
 msgctxt "%1 is what the rule matches"
 msgid "%1 → always ask"
-msgstr ""
+msgstr "%1 → chiedi sempre"
 
 #: src/core/RuleEngine.cpp
 #, kde-format
 msgctxt "%1 is what the rule matches"
 msgid "%1 → copy instead of opening"
-msgstr ""
+msgstr "%1 → copia invece di aprire"
 
 #: src/core/RuleEngine.cpp
 #, kde-format
 msgctxt "%1 is what the rule matches, %2 a browser or profile id"
 msgid "%1 → open in %2 (private)"
-msgstr ""
+msgstr "%1 → apri in %2 (privata)"
 
 #: src/core/RuleEngine.cpp
 #, kde-format
 msgctxt "%1 is what the rule matches, %2 a browser or profile id"
 msgid "%1 → open in %2"
-msgstr ""
+msgstr "%1 → apri in %2"
 
 #: src/core/RuleStore.cpp
 #, kde-format
 msgid "Cannot read rules.json; keeping the last valid configuration."
-msgstr ""
+msgstr "Impossibile leggere rules.json; viene mantenuta l'ultima configurazione valida."
 
 #: src/core/RuleStore.cpp
 #, kde-format
 msgid "Invalid rules.json at byte %1; keeping the last valid configuration."
-msgstr ""
+msgstr "rules.json non valido al byte %1; viene mantenuta l'ultima configurazione valida."
 
 #: src/core/RuleStore.cpp
 #, kde-format
 msgid "Cannot save until rules.json is readable and valid again."
-msgstr ""
+msgstr "Impossibile salvare finché rules.json non sarà di nuovo leggibile e valido."
 
 #: src/core/RuleStore.cpp
 #, kde-format
 msgid "Cannot create the Lob configuration directory."
-msgstr ""
+msgstr "Impossibile creare la cartella di configurazione di Lob."
 
 #: src/core/RuleStore.cpp
 #, kde-format
 msgid "Another process is updating rules.json; try again."
-msgstr ""
+msgstr "Un altro processo sta aggiornando rules.json; riprova."
 
 #: src/core/RuleStore.cpp
 #, kde-format
 msgid ""
 "rules.json changed externally. Review the new configuration and try again."
-msgstr ""
+msgstr "rules.json è stato modificato dall'esterno. Controlla la nuova configurazione e riprova."
 
 #: src/core/RuleStore.cpp
 #, kde-format
 msgid "Could not save rules.json: %1"
-msgstr ""
+msgstr "Impossibile salvare rules.json: %1"
 
 #: src/core/UrlSanitizer.cpp
 #, kde-format
 msgid "Not a valid URL."
-msgstr ""
+msgstr "URL non valido."
 
 #: src/core/UrlSanitizer.cpp
 #, kde-format
 msgid "Only http and https URLs are routed (got '%1')."
-msgstr ""
+msgstr "Vengono instradati solo URL http e https (ricevuto «%1»)."
 
 #: src/core/UrlSanitizer.cpp
 #, kde-format
 msgid "URL has no host."
-msgstr ""
+msgstr "L'URL non ha un host."
 
 #: src/core/UrlSanitizer.cpp
 #, kde-format
 msgid "URL contains embedded credentials."
-msgstr ""
+msgstr "L'URL contiene credenziali incorporate."
 
 #: src/main.cpp
 #, kde-format
 msgid "Routes links to the right browser"
-msgstr ""
+msgstr "Instrada i collegamenti al browser giusto"
 
 #: src/ui/PickerController.cpp
 #, kde-format
 msgid "The browser did not report back. The link may or may not have opened."
-msgstr ""
+msgstr "Il browser non ha risposto. Il collegamento potrebbe essere stato aperto oppure no."
 
 #: src/ui/PickerController.cpp
 #, kde-format
 msgid "Copying to clipboard"
-msgstr ""
+msgstr "Copia negli appunti"
 
 #: src/ui/PickerController.cpp
 #, kde-format
 msgid "Opening in %1 (private)"
-msgstr ""
+msgstr "Apertura in %1 (privata)"
 
 #: src/ui/PickerController.cpp
 #, kde-format
 msgid "Opening in %1"
-msgstr ""
+msgstr "Apertura in %1"
 
 #: src/ui/PickerController.cpp
 #, kde-format
 msgid "matched a rule"
-msgstr ""
+msgstr "corrisponde a una regola"
 
 #: src/ui/PickerController.cpp
 #, kde-format
 msgid "remembered for %1"
-msgstr ""
+msgstr "memorizzato per %1"
 
 #: src/ui/PickerController.cpp
 #, kde-format
 msgid "default target"
-msgstr ""
+msgstr "destinazione predefinita"
 
 #: src/ui/PickerController.cpp
 #, kde-format
 msgctxt "%1 is a host name"
 msgid "Remember for %1"
-msgstr ""
+msgstr "Memorizza per %1"
 
 #: src/ui/PickerController.cpp
 #, kde-format
 msgctxt "%1 is a domain name"
 msgid "Remember for %1 and its subdomains"
-msgstr ""
+msgstr "Memorizza per %1 e i suoi sottodomini"
 
 #: src/ui/PickerController.cpp
 #, kde-format
 msgctxt "%1 is a host and the first segment of a path"
 msgid "Remember for everything under %1"
-msgstr ""
+msgstr "Memorizza per tutto ciò che sta sotto %1"
 
 #: src/ui/PickerController.cpp
 #, kde-format
 msgid ""
 "The configured browser or profile is unavailable or ambiguous. Choose a "
 "browser for this link."
-msgstr ""
+msgstr "Il browser o il profilo configurato non è disponibile o è ambiguo. Scegli un browser per questo collegamento."
 
 #: qml/Picker.qml
 msgid "via %1"
-msgstr ""
+msgstr "tramite %1"
 
 #: qml/Picker.qml
 msgid "Opening browser…"
-msgstr ""
+msgstr "Apertura del browser…"
 
 #: qml/Picker.qml
 msgid "Nothing matches “%1”."
-msgstr ""
+msgstr "Nessun risultato per «%1»."
 
 #: qml/Picker.qml
 msgid "No browsers found. Install a browser, then refresh the list."
-msgstr ""
+msgstr "Nessun browser trovato. Installa un browser, poi aggiorna l'elenco."
 
 #: qml/Picker.qml
 msgid "type to filter"
-msgstr ""
+msgstr "digita per filtrare"
 
 #: qml/Picker.qml
 msgctxt "matching targets of total"
 msgid "%1 of %2"
-msgstr ""
+msgstr "%1 di %2"
 
 #: qml/Picker.qml
 msgid "Private browsing is unavailable for this target"
-msgstr ""
+msgstr "La navigazione privata non è disponibile per questa destinazione"
 
 #: qml/Picker.qml
 msgid "Update what I remember for %1"
-msgstr ""
+msgstr "Aggiorna ciò che è memorizzato per %1"
 
 #: qml/Picker.qml
 msgid "Remember for %1"
-msgstr ""
+msgstr "Memorizza per %1"
 
 #: qml/Picker.qml
 msgid "R for another scope"
-msgstr ""
+msgstr "R per un altro ambito"
 
 #: qml/Picker.qml
 msgid "Private window"
-msgstr ""
+msgstr "Finestra privata"
 
 #: qml/Picker.qml
 msgid "Any key or click to choose a different browser"
-msgstr ""
+msgstr "Premi un tasto o fai clic per scegliere un altro browser"
 
 #: qml/Picker.qml
 msgid ""
 "1–9 pick · Alt+P private · Alt+R remember · Alt+C copy · Esc clear filter"
-msgstr ""
+msgstr "1–9 scegli · Alt+P privata · Alt+R memorizza · Alt+C copia · Esc cancella filtro"
 
 #: qml/Picker.qml
 msgid ""
 "1–9 pick · / filter · P private · R remember · C copy · F5 refresh · Esc "
 "cancel"
-msgstr ""
+msgstr "1–9 scegli · / filtra · P privata · R memorizza · C copia · F5 aggiorna · Esc annulla"
 
 #: qml/Settings.qml
 msgctxt "@title:window"
 msgid "Lob Settings"
-msgstr ""
+msgstr "Impostazioni di Lob"
 
 #: qml/Settings.qml
 msgid "Host"
-msgstr ""
+msgstr "Host"
 
 #: qml/Settings.qml
 msgid "Domain"
-msgstr ""
+msgstr "Dominio"
 
 #: qml/Settings.qml
 msgid "URL prefix"
-msgstr ""
+msgstr "Prefisso URL"
 
 #: qml/Settings.qml
 msgid "Regular expression"
-msgstr ""
+msgstr "Espressione regolare"
 
 #: qml/Settings.qml
 msgid "Open"
-msgstr ""
+msgstr "Apri"
 
 #: qml/Settings.qml
 msgid "Always ask"
-msgstr ""
+msgstr "Chiedi sempre"
 
 #: qml/Settings.qml
 msgid "Copy"
-msgstr ""
+msgstr "Copia"
 
 #: qml/Settings.qml
 msgid "(none)"
-msgstr ""
+msgstr "(nessuna)"
 
 #: qml/Settings.qml
 msgctxt "browser, profile"
 msgid "%1 — %2"
-msgstr ""
+msgstr "%1 — %2"
 
 #: qml/Settings.qml
 msgctxt "a target id that is not installed"
 msgid "%1 (not installed)"
-msgstr ""
+msgstr "%1 (non installato)"
 
 #: qml/Settings.qml
 msgctxt "@title"
 msgid "Lob"
-msgstr ""
+msgstr "Lob"
 
 #: qml/Settings.qml
 msgid "Rules"
-msgstr ""
+msgstr "Regole"
 
 #: qml/Settings.qml
 msgid ""
 "The first rule that matches decides, so order matters. Rules always beat "
 "remembered choices."
-msgstr ""
+msgstr "Decide la prima regola che corrisponde, quindi l'ordine conta. Le regole hanno sempre la precedenza sulle scelte memorizzate."
 
 #: qml/Settings.qml
 msgid "A disabled rule stays in the file and decides nothing"
-msgstr ""
+msgstr "Una regola disattivata resta nel file e non decide nulla"
 
 #: qml/Settings.qml
 msgid "Match this earlier"
-msgstr ""
+msgstr "Verifica prima"
 
 #: qml/Settings.qml
 msgid "Match this later"
-msgstr ""
+msgstr "Verifica dopo"
 
 #: qml/Settings.qml
 msgid "Delete this rule"
-msgstr ""
+msgstr "Elimina questa regola"
 
 #: qml/Settings.qml
 msgid "Add Rule…"
-msgstr ""
+msgstr "Aggiungi regola…"
 
 #: qml/Settings.qml
 msgid "Remembered choices"
-msgstr ""
+msgstr "Scelte memorizzate"
 
 #: qml/Settings.qml
 msgid ""
 "Written by “remember” in the picker, narrowest first. Delete one to be asked "
 "again."
-msgstr ""
+msgstr "Scritte da «Memorizza» nel selettore, dalla più specifica. Eliminane una per essere interrogato di nuovo."
 
 #: qml/Settings.qml
 msgid "Forget this"
-msgstr ""
+msgstr "Dimentica"
 
 #: qml/Settings.qml
 msgid "Other applications"
-msgstr ""
+msgstr "Altre applicazioni"
 
 #: qml/Settings.qml
 msgid ""
 "These register for links without being browsers. They are hidden from the "
 "picker until enabled here."
-msgstr ""
+msgstr "Si registrano per i collegamenti pur non essendo browser. Restano nascoste nel selettore finché non vengono attivate qui."
 
 #: qml/Settings.qml
 msgid "Behaviour"
-msgstr ""
+msgstr "Comportamento"
 
 #: qml/Settings.qml
 msgid "Hold bar:"
-msgstr ""
+msgstr "Barra di attesa:"
 
 #: qml/Settings.qml
 msgid "ms — zero opens immediately, with nothing to interrupt"
-msgstr ""
+msgstr "ms — zero apre subito, senza nulla da interrompere"
 
 #: qml/Settings.qml
 msgid "ms before a decided link opens"
-msgstr ""
+msgstr "ms prima che un collegamento deciso venga aperto"
 
 #: qml/Settings.qml
 msgid "Strip tracking parameters from links"
-msgstr ""
+msgstr "Rimuovi i parametri di tracciamento dai collegamenti"
 
 #: qml/Settings.qml
 msgid "Everything here is %1, which stays hand-editable."
-msgstr ""
+msgstr "Tutto questo si trova in %1, che resta modificabile a mano."
 
 #: qml/Settings.qml
 msgctxt "@title:window"
 msgid "Add Rule"
-msgstr ""
+msgstr "Aggiungi regola"
 
 #: qml/Settings.qml
 msgid "Add"
-msgstr ""
+msgstr "Aggiungi"
+

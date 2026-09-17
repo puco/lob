@@ -90,18 +90,16 @@ PDFs, and refuses URLs carrying embedded credentials.
 
 %install
 %cmake_install
-# No %find_lang, because no translation ships yet: ki18n_install installs
-# nothing, %find_lang writes an empty list, and rpm refuses an empty -f file.
-# The first po/<lang>/lob.po to land needs `%find_lang %{name}` here and
-# `-f %{name}.lang` on %files below. po/README.md says so too, since that is
-# where whoever adds one will be looking.
+# Catalogues ship now, so the translated files go in their own list rather than
+# being enumerated by hand -- a language added later needs no change here.
+%find_lang %{name}
 
 %check
 # The GUI tests need a compositor, which no build root has. Everything else
 # runs headless; tests/run-under-compositor.sh covers the rest in CI.
 %ctest
 
-%files
+%files -f %{name}.lang
 %license LICENSE
 %doc README.md
 %{_bindir}/lob
