@@ -14,6 +14,11 @@ add_test(NAME ShortenerResolverTest COMMAND ShortenerResolverTest)
 set_tests_properties(ShortenerResolverTest PROPERTIES TIMEOUT 60)
 ecm_mark_as_test(ShortenerResolverTest)
 
+add_executable(RuleModelTest RuleModelTest.cpp)
+target_link_libraries(RuleModelTest PRIVATE lobui Qt6::Test)
+add_test(NAME RuleModelTest COMMAND RuleModelTest)
+ecm_mark_as_test(RuleModelTest)
+
 add_executable(PickerControllerTest PickerControllerTest.cpp)
 target_link_libraries(PickerControllerTest PRIVATE lobui Qt6::Test)
 add_test(NAME PickerControllerTest COMMAND PickerControllerTest)

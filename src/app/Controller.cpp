@@ -5,6 +5,7 @@
 #include "core/RuleStore.h"
 #include "core/ShortenerResolver.h"
 #include "core/UrlSanitizer.h"
+#include "ui/SettingsController.h"
 #include "core/DefaultBrowserManager.h"
 #include "ui/PickerController.h"
 
@@ -100,6 +101,7 @@ bool Controller::initialize()
         m_tray = new TrayController(this);
 
         connect(m_tray, &TrayController::quitRequested, qGuiApp, &QGuiApplication::quit);
+        connect(m_tray, &TrayController::settingsRequested, this, &Controller::showSettings);
         connect(m_tray, &TrayController::routeClipboardRequested, this, [this] {
             const QUrl url = QUrl::fromUserInput(QGuiApplication::clipboard()->text().trimmed());
             QString reason;
@@ -114,8 +116,37 @@ bool Controller::initialize()
     return true;
 }
 
+bool Controller::showingSettings() const
+{
+    return m_settings && m_settings->isVisible();
+}
+
+void Controller::showSettings()
+{
+    if (!m_settings) {
+        m_settings = new SettingsController(m_store, this);
+        connect(m_settings, &SettingsController::closed, this, [this] {
+            if (!m_daemon) {
+                quitWhenIdle();
+            }
+        });
+    }
+    if (!m_settings->show(m_engine)) {
+        qCWarning(LOG_CONTROLLER) << "settings window failed to load";
+    }
+}
+
 void Controller::handleArgs(const QStringList &args, const QString &activationToken)
 {
+    // A second `lob --settings` reaches the running daemon through
+    // KDBusService rather than starting another process, which is the whole
+    // reason the window belongs here rather than in a separate binary.
+    if (args.contains(QStringLiteral("--settings"))) {
+        showSettings();
+        m_acceptedAnyUrl = true; // something was asked for, so this is not an idle run
+        return;
+    }
+
     const bool forcePicker = args.contains(QStringLiteral("--pick"));
     QString token = activationToken;
 
@@ -284,7 +315,7 @@ void Controller::quitWhenIdle()
     // Deferred: a link may still be queued behind the one that just finished,
     // and exiting from inside its own completion would strand it.
     QTimer::singleShot(0, this, [this] {
-        if (!m_busy && m_queue.isEmpty() && !m_servingClipboard) {
+        if (!m_busy && m_queue.isEmpty() && !m_servingClipboard && !showingSettings()) {
             QCoreApplication::exit(0);
         }
     });

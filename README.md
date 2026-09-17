@@ -113,6 +113,7 @@ is not.
 lob --list                 # discovered browsers, profiles and launch commands
 lob --explain <url>        # which rule decides this URL, and which ones lost
 lob --forget <host>        # drop the choice remembered for a host, so it asks again
+lob --settings             # open the settings window
 lob --status               # who currently handles http/https
 lob --set-default          # claim the handler (records what was there first)
 lob --restore-default      # put the previous browser back
@@ -227,6 +228,25 @@ Add a redirector Lob does not know with `redirectWrappers`, mapping
 Set `"unwrapRedirects": false` to switch all of this off.
 
 ## Configuration
+
+**Configure Lob…** in the tray menu, or `lob --settings`, opens a window over
+the rules, the remembered choices, the applications that are hidden until
+enabled, and the hold duration. It edits the same `rules.json` described below
+and is not a replacement for it: the file stays hand-editable, and the window
+says where it is.
+
+The window is a second view onto the running daemon's configuration rather than
+a copy of it. A file edited in `$EDITOR` while the window is open, a choice
+remembered by a picker, and `lob --forget` all arrive the same way -- the
+configuration changed, and the window follows. A genuinely concurrent write is
+refused rather than silently winning, as it is everywhere else.
+
+Rules are shown in the order they are matched, because that order decides which
+one wins, and can be reordered there. Remembered choices are a separate section:
+they are kept narrowest-first by whatever wrote them, so they are listed and
+deleted rather than sorted. A rule that cannot work -- a `pathPrefix` with no
+path, an `open` with no target -- is refused when it is added, with the reason,
+rather than being saved into a file that then fails to load.
 
 `~/.config/lob/rules.json`, watched, so edits apply without a restart. A
 malformed or unreadable file leaves the last valid configuration active and
