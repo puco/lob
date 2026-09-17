@@ -80,6 +80,63 @@ private Q_SLOTS:
         QVERIFY(nothing.second.isEmpty()); // the complaint belongs on stderr
     }
 
+    void forgetRemovesAMemoryAndSaysSo()
+    {
+        // The picker's "remember for this host" has no undo in the UI, so this
+        // is the whole of it: if the CLI does not work, the choice is stuck.
+        const QString config = home.filePath(QStringLiteral("config/lob"));
+        QVERIFY(QDir().mkpath(config));
+        const auto writeRules = [&config] {
+            QFile rules(config + QStringLiteral("/rules.json"));
+            QVERIFY(rules.open(QIODevice::WriteOnly));
+            rules.write("{\"version\":1,\"rules\":["
+                        "{\"match\":\"host\",\"pattern\":\"bank.example\",\"action\":\"ask\"},"
+                        "{\"match\":\"host\",\"pattern\":\"news.example\",\"action\":\"open\","
+                        "\"target\":\"a.desktop\",\"remembered\":true,\"targetVersion\":2}]}");
+            rules.close();
+        };
+        const auto run = [this](const QStringList &arguments) {
+            QProcess process;
+            process.setProcessEnvironment(environment());
+            process.setProcessChannelMode(QProcess::SeparateChannels);
+            process.start(QStringLiteral(LOB_TEST_BINARY), arguments);
+            process.waitForFinished(10000);
+            return QPair<int, QByteArray>{process.exitCode(), process.readAllStandardOutput()};
+        };
+
+        writeRules();
+
+        // --explain is where someone finds out a memory is in the way, so it
+        // is where the undo has to be named.
+        const auto explained = run({QStringLiteral("--explain"), QStringLiteral("https://news.example/story")});
+        QCOMPARE(explained.first, 0);
+        QVERIFY2(explained.second.contains("lob --forget news.example"), explained.second.constData());
+
+        // A host and a URL are both accepted: after clicking something, a URL
+        // is what is to hand.
+        for (const auto &argument : {"news.example", "https://news.example/story"}) {
+            writeRules();
+            const auto forgotten = run({QStringLiteral("--forget"), QString::fromLatin1(argument)});
+            QCOMPARE(forgotten.first, 0);
+            QVERIFY2(forgotten.second.contains("forgot news.example"), forgotten.second.constData());
+
+            // Only the memory goes. A rule written by hand for another host is
+            // none of this command's business.
+            QFile rules(config + QStringLiteral("/rules.json"));
+            QVERIFY(rules.open(QIODevice::ReadOnly));
+            const auto written = rules.readAll();
+            QVERIFY2(!written.contains("news.example"), written.constData());
+            QVERIFY2(written.contains("bank.example"), written.constData());
+        }
+
+        // Nothing to forget is not a failure; it is the answer to the question.
+        const auto absent = run({QStringLiteral("--forget"), QStringLiteral("news.example")});
+        QCOMPARE(absent.first, 0);
+        QVERIFY2(absent.second.contains("nothing remembered"), absent.second.constData());
+
+        QCOMPARE(run({QStringLiteral("--forget")}).first, 2);
+    }
+
     void rejectedCredentialsAreNotLogged()
     {
         QProcess process;

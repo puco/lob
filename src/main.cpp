@@ -156,6 +156,9 @@ int runExplain(const QString &rawUrl)
     case Lob::Decision::Source::Memory:
         out << "-> remembered #" << decision.ruleIndex << ": "
             << Lob::RuleEngine::describe(rules.at(decision.ruleIndex)) << '\n';
+        // A memory is the one kind of rule nobody chose to write down, so it
+        // is the one worth saying how to undo.
+        out << "   undo with: lob --forget " << rules.at(decision.ruleIndex).pattern << '\n';
         break;
     case Lob::Decision::Source::Fallback:
         out << "-> no match; fallback target " << decision.targetId << '\n';
@@ -188,6 +191,45 @@ int runExplain(const QString &rawUrl)
         out << "   #" << i << ": " << Lob::RuleEngine::describe(rules.at(i)) << '\n';
     }
 
+    return 0;
+}
+
+/// Removes the "remember for this host" the picker wrote. This is the only
+/// undo for that checkbox short of hand-editing rules.json, which is why it
+/// exists: a choice made in passing should not be a one-way door.
+int runForget(const QString &argument)
+{
+    QTextStream out(stdout);
+
+    // People reach for this after clicking something, so the thing on the
+    // clipboard is a URL far more often than a bare host. Both work.
+    const QUrl url = QUrl::fromUserInput(argument);
+    const QString host = url.host().isEmpty() ? argument.trimmed().toLower() : url.host().toLower();
+    if (host.isEmpty()) {
+        QTextStream(stderr) << "usage: lob --forget <host|url>\n";
+        return 2;
+    }
+
+    Lob::RuleStore store;
+    if (!store.lastError().isEmpty()) {
+        // Saving is blocked while the file is unreadable, so say why rather
+        // than reporting a forget that never reached the disk.
+        out << store.lastError() << '\n';
+        return 1;
+    }
+
+    if (!store.hasMemory(host)) {
+        out << "nothing remembered for " << host << '\n';
+        return 0;
+    }
+
+    if (!store.forget(host)) {
+        out << (store.lastError().isEmpty() ? QStringLiteral("could not write the rules file") : store.lastError())
+            << '\n';
+        return 1;
+    }
+
+    out << "forgot " << host << "; it will ask again\n";
     return 0;
 }
 
@@ -234,13 +276,15 @@ void printUsage(QTextStream &out)
     out << QStringLiteral("lob " LOB_VERSION " -- choose which browser opens each link\n"
                           "\n"
                           "usage: lob [--daemon] [--pick] <url>\n"
-                          "       lob --list | --explain <url> | --status | --set-default | --restore-default\n"
+                          "       lob --list | --explain <url> | --forget <host> | --status\n"
+                          "       lob --set-default | --restore-default\n"
                           "\n"
                           "  <url>               route one URL: a rule decides, or the picker asks\n"
                           "  --pick <url>        route one URL, ignoring the rules\n"
                           "  --daemon            stay resident, so the picker opens without a delay\n"
                           "  --list              discovered browsers, profiles and launch commands\n"
                           "  --explain <url>     which rule decides this URL, and which ones lose\n"
+                          "  --forget <host>     drop the choice remembered for a host, so it asks again\n"
                           "  --status            who currently handles http and https\n"
                           "  --set-default       claim the handler, recording what was there first\n"
                           "  --restore-default   put the previous handler back\n"
@@ -313,15 +357,19 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (rawArgs.contains(QStringLiteral("--explain"))) {
+    for (const auto &mode : {"--explain", "--forget"}) {
+        const QString flag = QLatin1String(mode);
+        if (!rawArgs.contains(flag)) {
+            continue;
+        }
         QCoreApplication app(argc, argv);
         setupIdentity();
-        const int index = rawArgs.indexOf(QStringLiteral("--explain"));
+        const int index = rawArgs.indexOf(flag);
         if (index + 1 >= rawArgs.size()) {
-            QTextStream(stderr) << "usage: lob --explain <url>\n";
+            QTextStream(stderr) << "usage: lob " << flag << (flag == QLatin1String("--forget") ? " <host|url>\n" : " <url>\n");
             return 2;
         }
-        return runExplain(rawArgs.at(index + 1));
+        return flag == QLatin1String("--forget") ? runForget(rawArgs.at(index + 1)) : runExplain(rawArgs.at(index + 1));
     }
 
     const QString inboundToken = takeActivationToken();
