@@ -120,6 +120,26 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.5" date="2026-09-22">
+      <description>
+        <p>A release of fixes, most of all to focus.</p>
+        <ul>
+          <li>A link a rule or a remembered choice decides now brings the browser
+          to the front. Through the hold bar it mostly opened behind whatever
+          was already there.</li>
+          <li>The match and action dropdowns in the settings window edit the
+          rule they belong to, rather than whichever rule shared the option's
+          number.</li>
+          <li>Remembering a path covers that path segment and no other:
+          github.com/kde no longer answers for github.com/kdeconnect.</li>
+          <li>A shortened link inside a link scanner still opens through the
+          scanner once the shortener is resolved.</li>
+          <li>A hold as long as the maximum no longer drops the link.</li>
+          <li>Applications whose names merely contain a browser's, such as
+          "Operator", are no longer mistaken for browsers.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.4" date="2026-09-17">
       <description>
         <p>Lob can be configured without a text editor, and speaks three more languages.</p>

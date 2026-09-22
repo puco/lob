@@ -6,7 +6,7 @@
 # Fedora 42 and later have them.
 
 Name:           lob
-Version:        0.4
+Version:        0.5
 Release:        1%{?dist}
 Summary:        Choose which browser opens each link
 
@@ -110,6 +110,14 @@ PDFs, and refuses URLs carrying embedded credentials.
 %{_userunitdir}/lob.service
 
 %changelog
+* Tue Sep 22 2026 puco <puco@users.noreply.github.com> - 0.5-1
+- Bring the browser to the front after the hold bar, not only after the picker
+- Edit the right rule from the settings window's dropdowns
+- A remembered path covers its own path segment and no other
+- Keep a link scanner in front of a shortened link it wraps
+- A long hold no longer drops the link it was holding
+- Recognise browsers by whole words, not by fragments of other names
+
 * Thu Sep 17 2026 puco <puco@users.noreply.github.com> - 0.4-1
 - A settings window for rules, remembered choices and hidden handlers
 - Remember a choice for a host, a domain or a path, not only the host
