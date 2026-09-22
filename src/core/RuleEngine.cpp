@@ -57,7 +57,15 @@ bool RuleEngine::matches(const Rule &rule, const QUrl &url)
         }
         const QString patternHost = pattern.left(slash);
         const QString patternPath = rule.pattern.trimmed().mid(slash);
-        return host == patternHost && url.path().startsWith(patternPath, rule.caseSensitive ? Qt::CaseSensitive : Qt::CaseInsensitive);
+        const QString path = url.path();
+        if (host != patternHost || !path.startsWith(patternPath, rule.caseSensitive ? Qt::CaseSensitive : Qt::CaseInsensitive)) {
+            return false;
+        }
+        // A remembered path is a whole first segment -- "github.com/kde" was
+        // said about KDE, not about kdeconnect or kdenlive. A hand-written
+        // prefix stays a plain prefix, because that is what it was sold as.
+        return !rule.remembered || path.size() == patternPath.size() || patternPath.endsWith(QLatin1Char('/'))
+            || path.at(patternPath.size()) == QLatin1Char('/');
     }
 
     case MatchKind::Regex:

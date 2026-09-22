@@ -54,6 +54,19 @@ private Q_SLOTS:
         QVERIFY(!RuleEngine::matches(r, QUrl(QStringLiteral("https://gitlab.com/anthropics/x"))));
     }
 
+    void aRememberedPathCoversItsSegmentAndNoOther()
+    {
+        const Rule memory = rule(MatchKind::PathPrefix, QStringLiteral("github.com/kde"), QStringLiteral("a"), true);
+        QVERIFY(RuleEngine::matches(memory, QUrl(QStringLiteral("https://github.com/kde"))));
+        QVERIFY(RuleEngine::matches(memory, QUrl(QStringLiteral("https://github.com/kde/"))));
+        QVERIFY(RuleEngine::matches(memory, QUrl(QStringLiteral("https://github.com/kde/plasma"))));
+        QVERIFY(!RuleEngine::matches(memory, QUrl(QStringLiteral("https://github.com/kdeconnect/x"))));
+
+        // Written by hand, the same pattern is the prefix it says it is.
+        const Rule written = rule(MatchKind::PathPrefix, QStringLiteral("github.com/kde"), QStringLiteral("a"));
+        QVERIFY(RuleEngine::matches(written, QUrl(QStringLiteral("https://github.com/kdeconnect/x"))));
+    }
+
     void invalidRegexNeverMatches()
     {
         Rule r = rule(MatchKind::Regex, QStringLiteral("([unclosed"), QStringLiteral("a"));
