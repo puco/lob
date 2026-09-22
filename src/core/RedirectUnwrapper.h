@@ -20,6 +20,22 @@ struct Link {
 
     static Link plain(const QUrl &url) { return {url, url, {}}; }
     bool wasWrapped() const { return !wrapper.isEmpty(); }
+
+    /// This link read one step further, where @p inner is what its destination
+    /// turned out to be -- a shortener resolved over the network, say. The
+    /// outermost redirector is still the one to name, and a link scanner still
+    /// the URL to visit.
+    Link continuedBy(const Link &inner) const
+    {
+        Link link = inner;
+        if (wasWrapped()) {
+            link.wrapper = wrapper;
+        }
+        if (toOpen != destination) {
+            link.toOpen = toOpen;
+        }
+        return link;
+    }
 };
 
 /**

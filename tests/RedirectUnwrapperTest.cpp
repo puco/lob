@@ -185,6 +185,36 @@ private Q_SLOTS:
         QVERIFY(!link.wasWrapped());
         QCOMPARE(link.destination, shortened);
     }
+
+    void aResolvedShortenerKeepsWhatItArrivedInside()
+    {
+        // A shortener inside a scanner resolves over the network later. The
+        // destination moves on; the scanner is still what has to be visited,
+        // and still the redirector to name.
+        const QUrl shortened(QStringLiteral("https://bit.ly/abc123"));
+        const QUrl safeLink = wrapped(QStringLiteral("https://eu01.safelinks.protection.outlook.com/?"),
+                                      QStringLiteral("url"), shortened);
+        const Link scanned = RedirectUnwrapper::unwrap(safeLink);
+        QCOMPARE(scanned.destination, shortened);
+
+        const Link resolved = scanned.continuedBy(RedirectUnwrapper::unwrap(kDestination));
+        QCOMPARE(resolved.destination, kDestination);
+        QCOMPARE(resolved.toOpen, safeLink);
+        QCOMPARE(resolved.wrapper, QStringLiteral("eu01.safelinks.protection.outlook.com"));
+
+        // Through a chat redirect instead, the browser is handed the page
+        // itself -- but the picker still says where the link came from.
+        const Link chat = RedirectUnwrapper::unwrap(wrapped(QStringLiteral("https://slack-redir.net/link?"),
+                                                            QStringLiteral("url"), shortened));
+        const Link opened = chat.continuedBy(RedirectUnwrapper::unwrap(kDestination));
+        QCOMPARE(opened.toOpen, kDestination);
+        QCOMPARE(opened.wrapper, QStringLiteral("slack-redir.net"));
+
+        // And a shortener that arrived bare stays unwrapped.
+        const Link bare = Link::plain(shortened).continuedBy(RedirectUnwrapper::unwrap(kDestination));
+        QCOMPARE(bare.toOpen, kDestination);
+        QVERIFY(!bare.wasWrapped());
+    }
 };
 
 QTEST_GUILESS_MAIN(RedirectUnwrapperTest)

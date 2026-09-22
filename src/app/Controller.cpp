@@ -235,7 +235,9 @@ void Controller::processQueue()
                                         << "to host" << destination.host();
                 // Whatever it resolved to gets read the same way anything else
                 // does: it may be wrapped in turn, and it may carry tracking.
-                pending.link = prepare(destination);
+                // What the shortener arrived inside still applies, though -- a
+                // scanned link is still opened through the scanner.
+                pending.link = pending.link.continuedBy(prepare(destination));
             }
             route(pending);
         });
