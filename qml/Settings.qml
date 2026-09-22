@@ -71,6 +71,10 @@ Kirigami.ApplicationWindow {
             Repeater {
                 model: settings.rules
                 delegate: Kirigami.AbstractCard {
+                    id: ruleCard
+                    // ComboBox.activated(int index) shadows the delegate's own
+                    // index inside its handler, so the row is read from here.
+                    readonly property int row: index
                     Layout.fillWidth: true
                     contentItem: ColumnLayout {
                         RowLayout {
@@ -119,7 +123,7 @@ Kirigami.ApplicationWindow {
                             QQC2.ComboBox {
                                 model: root.matchNames
                                 currentIndex: matchKind
-                                onActivated: settings.rules.setMatchKind(index, currentIndex)
+                                onActivated: settings.rules.setMatchKind(ruleCard.row, currentIndex)
                             }
                             QQC2.TextField {
                                 Layout.fillWidth: true
@@ -129,7 +133,7 @@ Kirigami.ApplicationWindow {
                             QQC2.ComboBox {
                                 model: root.actionNames
                                 currentIndex: action
-                                onActivated: settings.rules.setAction(index, currentIndex)
+                                onActivated: settings.rules.setAction(ruleCard.row, currentIndex)
                             }
                             QQC2.Label {
                                 visible: action === 0
