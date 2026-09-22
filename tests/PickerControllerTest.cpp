@@ -325,6 +325,23 @@ private Q_SLOTS:
         QTRY_COMPARE(finished.count(), 1);
     }
 
+    void aHoldLongerThanTheWatchdogStillOpens()
+    {
+        RuleStore store;
+        QVERIFY(store.setHoldMs(120));
+        FakeLauncher launcher;
+        PickerController picker(&store, nullptr, &launcher, 30);
+        populate(picker);
+        Decision decision;
+        decision.source = Decision::Source::Rule;
+        decision.action = RuleAction::Open;
+        decision.targetId = QStringLiteral("test.desktop#profile");
+        picker.showHold(Link::plain(url), {}, decision);
+        QTest::qWait(60); // past the watchdog, still inside the hold
+        QCOMPARE(picker.mode(), PickerController::Mode::Hold);
+        QTRY_COMPARE(launcher.callbacks.size(), 1);
+    }
+
     void watchdogDoesNotAdvanceQueueWhileDispatchIsPending()
     {
         RuleStore store;

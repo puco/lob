@@ -89,6 +89,14 @@ void PickerController::watchdogExpired()
         return;
     }
 
+    if (m_mode == Mode::Hold && m_holdTimer.isActive()) {
+        // A rule has already decided, and a hold as long as the watchdog is a
+        // setting, not a stuck surface: the hold timer ends it either way.
+        // Cancelling here would throw away a link that was about to open.
+        m_watchdog.start();
+        return;
+    }
+
     cancel();
 }
 
