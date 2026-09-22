@@ -19,6 +19,9 @@
 #include <QWindow>
 #include <QRegularExpression>
 #include <QStandardPaths>
+#include <QLoggingCategory>
+
+Q_LOGGING_CATEGORY(LOG_LAUNCHER, "lob.launcher")
 
 namespace Lob
 {
@@ -277,7 +280,11 @@ void Launcher::launch(const Target &target,
         return;
     }
 
-    if (!window || !window->isVisible() || !KWindowSystem::isPlatformWayland()) {
+    // A token handed in is the one to use, even with a window to mint from:
+    // KWin keeps a single current token, so minting would replace it, and the
+    // caller passes one only when it is the more recent of the two.
+    if (!activationToken.isEmpty() || !window || !window->isVisible() || !KWindowSystem::isPlatformWayland()) {
+        qCDebug(LOG_LAUNCHER) << "launching" << target.id << (activationToken.isEmpty() ? "without an activation token" : "with the token passed in");
         if (operation->cancelled) {
             done({LaunchResult::Cancelled, {}});
         } else {
@@ -298,6 +305,7 @@ void Launcher::launch(const Target &target,
             return;
         }
         *resolved = true;
+        qCDebug(LOG_LAUNCHER) << "launching" << target.id << (token.isEmpty() ? "without a token: minting timed out" : "with a minted token");
         if (operation->cancelled) {
             done({LaunchResult::Cancelled, {}});
             return;

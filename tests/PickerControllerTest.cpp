@@ -15,10 +15,12 @@ public:
     QList<Completion> callbacks;
     QList<QSharedPointer<LaunchOperation>> operations;
     QList<QUrl> urls;
+    QStringList tokens;
     void launch(const Target &, const QUrl &url, bool, QWindow *, Completion done,
-                const QString &, QSharedPointer<LaunchOperation> operation) override
+                const QString &token, QSharedPointer<LaunchOperation> operation) override
     {
         urls.append(url);
+        tokens.append(token);
         callbacks.append(done);
         operations.append(operation);
     }
@@ -340,6 +342,48 @@ private Q_SLOTS:
         QTest::qWait(60); // past the watchdog, still inside the hold
         QCOMPARE(picker.mode(), PickerController::Mode::Hold);
         QTRY_COMPARE(launcher.callbacks.size(), 1);
+    }
+
+    void theHoldBarHandsTheBrowserTheLinksOwnToken()
+    {
+        // Nothing is touched during a hold, so the token the link arrived with
+        // is the one that carries the latest interaction -- the click.
+        RuleStore store;
+        QVERIFY(store.setHoldMs(20));
+        FakeLauncher launcher;
+        PickerController picker(&store, nullptr, &launcher);
+        populate(picker);
+        Decision decision;
+        decision.source = Decision::Source::Memory;
+        decision.action = RuleAction::Open;
+        decision.targetId = QStringLiteral("test.desktop#profile");
+        picker.showHold(Link::plain(url), QStringLiteral("inbound"), decision);
+        QTRY_COMPARE(launcher.tokens.size(), 1);
+        QCOMPARE(launcher.tokens.first(), QStringLiteral("inbound"));
+    }
+
+    void aChoiceInThePickerLeavesTheTokenToTheLauncher()
+    {
+        // A keypress in the picker is newer than the click that opened it, so
+        // the link's token no longer qualifies and a fresh one is minted.
+        RuleStore store;
+        QVERIFY(store.setHoldMs(1000));
+        FakeLauncher launcher;
+        PickerController picker(&store, nullptr, &launcher);
+        populate(picker);
+        picker.showPicker(Link::plain(url), QStringLiteral("inbound"));
+        picker.choose(0, false, int(MemoryScope::None));
+        QCOMPARE(launcher.tokens, QStringList{QString()});
+
+        launcher.callbacks.first()({});
+        Decision decision;
+        decision.action = RuleAction::Open;
+        decision.targetId = QStringLiteral("test.desktop#profile");
+        picker.showHold(Link::plain(url), QStringLiteral("inbound"), decision);
+        picker.interruptHold();
+        picker.choose(0, false, int(MemoryScope::None));
+        QCOMPARE(launcher.tokens.size(), 2);
+        QCOMPARE(launcher.tokens.last(), QString());
     }
 
     void watchdogDoesNotAdvanceQueueWhileDispatchIsPending()

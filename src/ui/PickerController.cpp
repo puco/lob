@@ -511,7 +511,10 @@ void PickerController::present(const QString &activationToken)
         KWindowSystem::setCurrentXdgActivationToken(activationToken);
     }
     KWindowSystem::activateWindow(m_window);
-    m_activationToken.clear();
+    // The hold bar keeps the link's token for the browser; see startLaunch().
+    if (m_mode != Mode::Hold) {
+        m_activationToken.clear();
+    }
 }
 
 void PickerController::checkHeldModifiers()
@@ -614,6 +617,15 @@ void PickerController::choose(int index, bool privateWindow, int scope)
 
 void PickerController::startLaunch(const Target &target, bool privateWindow, MemoryScope scope)
 {
+    // KWin raises the browser only for a token at least as recent as the last
+    // user interaction anywhere. Through the hold bar nothing was touched, so
+    // the link's own token -- carrying the click that opened it -- is the one
+    // that qualifies; one minted here would carry our own last input serial,
+    // from an earlier picker or none at all, and leave the browser behind.
+    // After a choice in the picker that keypress is the newest interaction,
+    // so the launcher mints from it instead.
+    const QString token = m_mode == Mode::Picker ? QString() : m_activationToken;
+
     m_holdTimer.stop();
     m_launchStalled = false;
     m_watchdog.start();
@@ -642,7 +654,7 @@ void PickerController::startLaunch(const Target &target, bool privateWindow, Mem
                 guard->m_store->remember(scope, remembered, target.id, privateWindow);
             }
             guard->finish();
-        }, m_activationToken, m_operation);
+        }, token, m_operation);
 }
 
 void PickerController::finish()
