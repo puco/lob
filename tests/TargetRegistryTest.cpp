@@ -93,6 +93,31 @@ private Q_SLOTS:
         }
     }
 
+    void anEngineNameMustBeAWholeWord()
+    {
+        // Neither says it is a browser, so only a mistaken engine match would
+        // make one of them one.
+        const auto handler = [this](const QString &id, const QString &name) {
+            const auto path = home.filePath(id + QStringLiteral(".desktop"));
+            write(path, "[Desktop Entry]\nType=Application\nName=" + name.toUtf8() + "\nExec=/usr/bin/" + id.toUtf8()
+                        + " %u\nMimeType=x-scheme-handler/https;\n");
+            return KService::Ptr(new KService(path));
+        };
+        for (const auto &target : TargetRegistry::fromServices(
+                 {handler(QStringLiteral("kbase"), QStringLiteral("Knowledge Base")),
+                  handler(QStringLiteral("operator"), QStringLiteral("Operator"))}, {})) {
+            QCOMPARE(target.family, EngineFamily::Unknown);
+            QCOMPARE(target.kind, TargetKind::OtherHandler);
+        }
+
+        // Still found when it is a word in a longer name.
+        const auto edge = TargetRegistry::fromServices(
+            {handler(QStringLiteral("microsoft-edge-stable"), QStringLiteral("Microsoft Edge"))}, {});
+        QVERIFY(!edge.isEmpty());
+        QCOMPARE(edge.first().family, EngineFamily::Chromium);
+        QCOMPARE(edge.first().kind, TargetKind::Browser);
+    }
+
     void anUnknownPrivateFlagIsReadFromTheActionThatDeclaresIt()
     {
         // Browsers outside the two big families spell this however they like.

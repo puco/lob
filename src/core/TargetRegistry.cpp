@@ -8,6 +8,7 @@
 #include <KServiceAction>
 #include <KShell>
 
+#include <QRegularExpression>
 #include <QFileInfo>
 #include <QHash>
 #include <QStandardPaths>
@@ -91,13 +92,22 @@ EngineFamily guessFamily(const QString &print)
         QStringLiteral("thorium"),
     };
 
+    // Whole words only. Several of these are short enough to turn up inside
+    // an unrelated name -- "edge" in "Knowledge Base", "opera" in "Operator"
+    // -- and a known engine makes an entry a browser outright.
+    const auto mentions = [&print](const QString &needle) {
+        const QRegularExpression word(QStringLiteral("(?<![a-z0-9])") + QRegularExpression::escape(needle)
+                                      + QStringLiteral("(?![a-z0-9])"));
+        return word.match(print).hasMatch();
+    };
+
     for (const QString &needle : gecko) {
-        if (print.contains(needle)) {
+        if (mentions(needle)) {
             return EngineFamily::Gecko;
         }
     }
     for (const QString &needle : chromium) {
-        if (print.contains(needle)) {
+        if (mentions(needle)) {
             return EngineFamily::Chromium;
         }
     }
