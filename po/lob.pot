@@ -387,11 +387,6 @@ msgid "(none)"
 msgstr ""
 
 #: qml/Settings.qml
-msgctxt "browser, profile"
-msgid "%1 — %2"
-msgstr ""
-
-#: qml/Settings.qml
 msgctxt "a target id that is not installed"
 msgid "%1 (not installed)"
 msgstr ""

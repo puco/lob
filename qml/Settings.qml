@@ -25,9 +25,8 @@ Kirigami.ApplicationWindow {
         if (id === "") return i18n("(none)")
         for (let i = 0; i < settings.targets.length; ++i) {
             const t = settings.targets[i]
-            if (t.id === id) {
-                return t.profileName === "" ? t.label : i18nc("browser, profile", "%1 — %2", t.label, t.profileName)
-            }
+            // A profile's label already names the profile ("Firefox — Work").
+            if (t.id === id) return t.label
         }
         // A rule can name a browser that is not installed here. Saying so beats
         // showing an empty cell that looks like the rule lost its target.
